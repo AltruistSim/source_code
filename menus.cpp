@@ -1,8 +1,8 @@
 /****************************  menus.cpp   ************************************
 * Author:        Agner Fog
 * Date created:  2023-08-07
-* Last modified: 2023-12-31
-* Version:       3.00.00
+* Last modified: 2024-06-25
+* Version:       3.001
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the general user interface with menus and dialogs.
@@ -82,22 +82,30 @@ void Altruist::setupMenus() {
         [this](bool checked) {
             QString filename = QFileDialog::getOpenFileName(this, 
                 "Read parameter file", parameterFilePath, "*.altru");
-            QFileInfo fi(filename);
-            parameterFileName = fi.fileName();
-            parameterFilePath = fi.absolutePath();
-            readParameterFile(filename);
-            d.parametersChanged = true;
-            (*(models.getModel(d.iModel)->initFunction))(&d, model_initialize); // initialize new model
+            if (filename != "") {
+                QFileInfo fi(filename);
+                parameterFileName = fi.fileName();
+                parameterFilePath = fi.absolutePath();
+                readParameterFile(filename);
+                d.parametersChanged = true;
+                (*(models.getModel(d.iModel)->initFunction))(&d, model_initialize); // initialize new model
+            }
         });
 
     connect(save_action, &QAction::triggered,
         [this](bool checked) {
+            QString title = "Save parameter file";
+            if (parameterFileName != "") {
+                title = title + " (" + parameterFileName + ")"; // show last filename in title
+            }
             QString filename = QFileDialog::getSaveFileName(this, 
-                "Save parameter file", parameterFilePath, "*.altru");
-            QFileInfo fi(filename);
-            parameterFileName = fi.fileName();
-            parameterFilePath = fi.absolutePath();
-            writeParameterFile(filename);
+                title, parameterFilePath, "*.altru");
+            if (filename != "") {
+                QFileInfo fi(filename);
+                parameterFileName = fi.fileName();
+                parameterFilePath = fi.absolutePath();
+                writeParameterFile(filename);
+            }
         });
 
     connect(outputfile_action1, &QAction::triggered,
@@ -192,7 +200,19 @@ void Altruist::setupMenus() {
 
     connect(menuHelp, &QAction::triggered,
         [this](bool checked) {
-            messageBox("Please see altruist_manual.pdf for instructions", "Help");
+            QString helpText("Please see the <a href=\"https://github.com/AltruistSim/documentation/blob/main/altruist_manual.pdf\">Altruist manual</a> for help.");
+            QString versionText("<br /><br />Altruist version %1.%2.");
+            versionText = versionText.arg(altruistMajorVersion).arg(altruistMinorVersion, 3, 10, QChar('0'));
+
+            QMessageBox mb("Help", helpText + versionText, QMessageBox::NoIcon,
+            QMessageBox::Ok | QMessageBox::Default,
+            QMessageBox::NoButton, QMessageBox::NoButton);
+            mb.exec();
+
+
+
+//            messageBox("Please see altruist_manual.pdf for instructions", "Help");
+//            QMessageBox hh(0, QString("Help"), text);
         });
 }
 

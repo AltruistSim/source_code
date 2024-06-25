@@ -2,7 +2,7 @@
 * Author:        Agner Fog
 * Date created:  2023-09-04
 * Last modified: 2023-12-31
-* Version:       3.00.00
+* Version:       3.001
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the island model with fixed geographic boundaries between groups

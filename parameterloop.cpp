@@ -1,8 +1,8 @@
 /**************************  parameterloop.cpp   ******************************
 * Author:        Agner Fog
 * Date created:  1995-02-10
-* Last modified: 2023-12-31
-* Version:       3.00.00
+* Last modified: 2024-06-22
+* Version:       3.001
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file controls parameter loops that let you run multiple simulations
@@ -30,7 +30,7 @@ SweepParameter sweepParameterList[] = {
     {altruDataOffset(migrationRate[0]), varFloat, 2, 0x1000, 0, "migration rate"},
     {altruDataOffset(fitExpo), varFloat, 1, 0, 0x1000, "group fitness exponent"},
     {altruDataOffset(fit[2]), varFloat, 2, -1, -1, "altruist fitness"},
-    {altruDataOffset(fit[0]), varFloat, 8, 0, -1, "fitness ratio"},  // fitness ratio of altruists over egoists
+    {altruDataOffset(fit[0]), varFloat, 8, 0, -1, "individual fitness ratio"},  // fitness ratio of altruists over egoists
     {altruDataOffset(extinctionRate[0]), varFloat, 2, 0, 2, "extinction rate for egoist groups"},
     {altruDataOffset(warIntensity), varFloat, 1, 0, 0x80, "war intensity"},
     {altruDataOffset(nMaxPerDeme), varInt32, 1, 0x04, 0, "max group size"},    
@@ -38,8 +38,8 @@ SweepParameter sweepParameterList[] = {
     {altruDataOffset(colonySize), varInt32, 1, 0x200, 0, "colony size"},
     {altruDataOffset(surviv), varFloat, 1, 0, 0x10, "survival rate"},
     {altruDataOffset(haystackPeriod), varInt32, 1, 0, 0x100, "haystack period"},
-    {altruDataOffset(fit[0]), varFloat, 9, 0, 0x1140, "fitness ratio among altruists/egoists"},   // fitness ratio of all among altruists over egoists
-    // the arraysize is actually 8, but the value 9 is used for distinguishing this from "fitness ratio" above
+    {altruDataOffset(fit[0]), varFloat, 9, 0, 0x1140, "fitness among altruists/egoists"},   // fitness ratio of all among altruists over egoists
+    // the arraysize is actually 8, but the value 9 is used for distinguishing this from "individual fitness ratio" above
     {altruDataOffset(leaderAdvantage), varFloat, 1, 0, 0x10000, "leader advantage"},    
     {0, 0, 0, 0}                       // list must end with zeroes
 };

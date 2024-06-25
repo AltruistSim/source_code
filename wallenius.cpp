@@ -1,8 +1,8 @@
 /****************************  wallenius.cpp   *****************************
 * Author:        Agner Fog
 * Date created:  2002-10-20
-* Last modified: 2023-12-31
-* Version:       3.00.00
+* Last modified: 2024-05-10
+* Version:       3.001
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines Wallenius' and Fisher's noncentral hypergeometric distributions
@@ -277,7 +277,7 @@ int32_t RandomVariates::walleniusNCHypInversion(int32_t n, int32_t m, int32_t N,
     // sampling from Wallenius noncentral hypergeometric distribution 
     // using down-up search starting at the mean using the chop-down technique.
     // This method is faster than the rejection method when the variance is low.
-    int32_t wall_x1, x2;                         // search values
+    int32_t x1s, x1, x2;                     // search values
     int32_t xmin, xmax;                          // x limits
     double   u;                                  // uniform random number to be converted
     double   f;                                  // probability function value
@@ -293,24 +293,25 @@ int32_t RandomVariates::walleniusNCHypInversion(int32_t n, int32_t m, int32_t N,
     accura = accuracy * 0.01;
     if (accura > 1E-7) accura = 1E-7;            // absolute accuracy
 
-    wall_x1 = (int32_t)(wnch1.mean());           // start at floor and ceiling of mean
-    x2 = wall_x1 + 1;
+    x1s = (int32_t)(wnch1.mean());               // start at floor x1 and ceiling x2 of mean
     xmin = m + n - N; if (xmin < 0) xmin = 0;    // calculate limits
     xmax = n;     if (xmax > m) xmax = m;
-    updown = 3;                                  // start searching both up and down
 
     while (true) {                               // loop until accepted (normally executes only once)
+        x1 = x1s;
+        x2 = x1s + 1;
+        updown = 3;                              // start searching both up and down
         u = random();                            // uniform random number to be converted
         while (updown) {                         // search loop
             if (updown & 1) {                    // search down
-                if (wall_x1 < xmin) {
+                if (x1 < xmin) {
                     updown &= ~1;                // stop searching down
                 }
                 else {
-                    f = wnch1.probability(wall_x1);
+                    f = wnch1.probability(x1);
                     u -= f;                      // subtract probability until 0
-                    if (u <= 0.) return wall_x1;
-                    wall_x1--;
+                    if (u <= 0.) return x1;
+                    x1--;
                     if (f < accura) updown &= ~1;// stop searching down
                 }
             }
