@@ -1,8 +1,8 @@
 /****************************  altruist.cpp   *********************************
 * Author:        Agner Fog
 * Date created:  2023-03-30
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-08
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the general user interface with menus and dialogs.
@@ -76,7 +76,7 @@ Altruist::~Altruist() {
         if (workerThread.isRunning()) workerThread.wait();
     }
     // free allocated memory
-    if (d.demeData) delete[] d.demeData;
+    if (d.groupData) delete[] d.groupData;
     for (int i = 0; i < numExtraBuffers; i++) {
         if (d.extraBuffer[i]) delete[] d.extraBuffer[i];
     }

@@ -1,8 +1,8 @@
 /****************************  menus.cpp   ************************************
 * Author:        Agner Fog
 * Date created:  2023-08-07
-* Last modified: 2024-06-25
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the general user interface with menus and dialogs.
@@ -203,6 +203,7 @@ void Altruist::setupMenus() {
             QString helpText("Please see the <a href=\"https://github.com/AltruistSim/documentation/blob/main/altruist_manual.pdf\">Altruist manual</a> for help.");
             QString versionText("<br /><br />Altruist version %1.%2.");
             versionText = versionText.arg(altruistMajorVersion).arg(altruistMinorVersion, 3, 10, QChar('0'));
+            //versionText = versionText.arg(altruistMajorVersion).arg(altruistMinorVersion);
 
             QMessageBox mb("Help", helpText + versionText, QMessageBox::NoIcon,
             QMessageBox::Ok | QMessageBox::Default,
@@ -280,8 +281,11 @@ ModelDialogBox::ModelDialogBox(Altruist *parent) :
     dialogLayout.addWidget(&modelLabel, 0, 0);
     dialogLayout.addWidget(&modelComboBox, 0, 1, Qt::AlignRight);
     dialogLayout.addWidget(&descriptionButton, 1, 1);
-    dialogLayout.addWidget(&okButton, 2, 0);
-    dialogLayout.addWidget(&cancelButton, 2, 1);
+    modelFileName.setText(parent->parameterFileName); // name of last model file
+    dialogLayout.addWidget(&modelFileName, 2, 0);    
+
+    dialogLayout.addWidget(&okButton, 3, 0);
+    dialogLayout.addWidget(&cancelButton, 3, 1);
     setLayout(&dialogLayout);
 
     setWindowTitle(tr("Select model"));
@@ -313,12 +317,12 @@ GeographyDialogBox::GeographyDialogBox(Altruist *parent) :
     labelTotArea(tr("&Total area:")),
     labelMaxIslands("Maximum number of groups"),
 
-    labelMaxPerDeme("Maximum individuals per group"),
+    labelMaxPerGroup("Maximum individuals per group"),
     labelPopulationDensity0((parent->d.bGeographyParametersUsed & 0x20) ?        
         "Carrying capacity under egoism" : "Carrying capacity"), // carrying capacity per area unit (floating territories)
     labelPopulationDensity1("Carrying capacity under altruism"), // carrying capacity per area unit (floating territories)
-    labelTerritorySizeMax("Max. territory area"),                // max area of deme territory (floating territories)
-    labelTerritorySizeMin("Min. territory area"),                // min area of deme territory (floating territories)
+    labelTerritorySizeMax("Max. territory area"),                // max area of group territory (floating territories)
+    labelTerritorySizeMin("Min. territory area"),                // min area of group territory (floating territories)
     labelCapacityStdDev("Carrying capacity std. deviation"),     // Carrying capacity standard deviation
     labelRecolGroupSize("Colonization group size"),              //  recolonization group size
     labelMix("Migration rate"),
@@ -331,7 +335,7 @@ GeographyDialogBox::GeographyDialogBox(Altruist *parent) :
 
     editTotArea(this),
     editMaxIslands(this),
-    editMaxPerDeme(this),
+    editMaxPerGroup(this),
     editPopulationDensity0(this),
     editPopulationDensity1(this),
     editTerritorySizeMax(this),
@@ -373,14 +377,14 @@ GeographyDialogBox::GeographyDialogBox(Altruist *parent) :
         editMaxIslands.setVisible(false);
     }
     if (fieldsUsed1 & 4) {
-        labelMaxPerDeme.setBuddy(&editMaxPerDeme);
-        dialogLayout.addWidget(&labelMaxPerDeme, row, 0);
-        dialogLayout.addWidget(&editMaxPerDeme, row++, 1, Qt::AlignRight);
-        parent->writeIntField(editMaxPerDeme, parent->d.nMaxPerDeme);
+        labelMaxPerGroup.setBuddy(&editMaxPerGroup);
+        dialogLayout.addWidget(&labelMaxPerGroup, row, 0);
+        dialogLayout.addWidget(&editMaxPerGroup, row++, 1, Qt::AlignRight);
+        parent->writeIntField(editMaxPerGroup, parent->d.nMaxPerGroup);
     }
     else {
-        labelMaxPerDeme.setVisible(false);
-        editMaxPerDeme.setVisible(false);
+        labelMaxPerGroup.setVisible(false);
+        editMaxPerGroup.setVisible(false);
     }
     if (fieldsUsed1 & 0x10) {
         labelPopulationDensity0.setBuddy(&editPopulationDensity0);  // float: allow 0-9+-.E
@@ -549,8 +553,8 @@ GeographyDialogBox::GeographyDialogBox(Altruist *parent) :
         if ((fieldsUsed1 & 2) && editMaxIslands.isModified()) {
             parent->d.maxIslands = parent->readIntField(editMaxIslands);
         }
-        if ((fieldsUsed1 & 4) && editMaxPerDeme.isModified()) {
-            parent->d.nMaxPerDeme = parent->readIntField(editMaxPerDeme);
+        if ((fieldsUsed1 & 4) && editMaxPerGroup.isModified()) {
+            parent->d.nMaxPerGroup = parent->readIntField(editMaxPerGroup);
         }
         if ((fieldsUsed1 & 0x10) && editPopulationDensity0.isModified()) {
             parent->d.carryingCapacity[0] = parent->readFloatField(editPopulationDensity0);
@@ -741,7 +745,7 @@ FitnessDialogBox::FitnessDialogBox(Altruist *parent) :
     labelMixingPeriod("mixing period"),
     labelDependGroupSuccessOn("Dependence of group success on:"),
     labelGroupFitnessFunction("Group fitness function:"),
-    labelGroupFitnessExponent("exponent:"),
+    labelGroupFitnessCurvature("curvature exponent:"),
 
     okButton("OK", this),
     cancelButton("Cancel", this)
@@ -896,9 +900,9 @@ FitnessDialogBox::FitnessDialogBox(Altruist *parent) :
         dialogLayout.addWidget(&labelGroupFitnessFunction, row, 0);
         dialogLayout.addWidget(&comboGroupFitnessFunction, row, 1);
         labelGroupFitnessFunction.setBuddy(&comboGroupFitnessFunction);
-        dialogLayout.addWidget(&labelGroupFitnessExponent, row, 2);
-        dialogLayout.addWidget(&editGroupFitnessExponent, row++, 3);
-        labelGroupFitnessExponent.setBuddy(&editGroupFitnessExponent);
+        dialogLayout.addWidget(&labelGroupFitnessCurvature, row, 2);
+        dialogLayout.addWidget(&editGroupFitnessCurvature, row++, 3);
+        labelGroupFitnessCurvature.setBuddy(&editGroupFitnessCurvature);
         static const char * groupFitNames[5] = {
             "one is enough", "convex", "linear", "concave", "all or nothing"};
         for (i = 0, j = 0; i < 5; i++) {
@@ -912,19 +916,19 @@ FitnessDialogBox::FitnessDialogBox(Altruist *parent) :
                 groupfitFunctionsRev[i] = 1;
             }
         }
-        if (d->fitExpo <= 0.0f) groupfitIndex = 0;
-        else if (d->fitExpo < 1.0f) groupfitIndex = 1;
-        else if (d->fitExpo == 1.0f) groupfitIndex = 2;
-        else if (d->fitExpo < 1.0E30) groupfitIndex = 3;
+        if (d->groupFitCurvature <= 0.0f) groupfitIndex = 0;
+        else if (d->groupFitCurvature < 1.0f) groupfitIndex = 1;
+        else if (d->groupFitCurvature == 1.0f) groupfitIndex = 2;
+        else if (d->groupFitCurvature < 1.0E30) groupfitIndex = 3;
         else groupfitIndex = 4;
         comboGroupFitnessFunction.setCurrentIndex(groupfitFunctionsRev[groupfitIndex]);
-        parent->writeFloatField(editGroupFitnessExponent, d->fitExpo);
+        parent->writeFloatField(editGroupFitnessCurvature, d->groupFitCurvature);
     }
     else {
         labelGroupFitnessFunction.setVisible(false);
         comboGroupFitnessFunction.setVisible(false);
-        labelGroupFitnessExponent.setVisible(false);
-        editGroupFitnessExponent.setVisible(false);
+        labelGroupFitnessCurvature.setVisible(false);
+        editGroupFitnessCurvature.setVisible(false);
     }
     groupfitModified = false;
 
@@ -1123,7 +1127,7 @@ FitnessDialogBox::FitnessDialogBox(Altruist *parent) :
         });
 
     connect(&comboGroupFitnessFunction, &QComboBox::activated, [this, parent]() {
-        // group fitness combo box index changed. change editGroupFitnessExponent accordingly
+        // group fitness combo box index changed. change editGroupFitnessCurvature accordingly
         groupfitModified = true;
         int j = groupfitFunctions[comboGroupFitnessFunction.currentIndex()];
         float gf;
@@ -1139,14 +1143,14 @@ FitnessDialogBox::FitnessDialogBox(Altruist *parent) :
             case 3: gf = 2.0f;  break;
             default: gf = infinity.f;
             }
-            parent->writeFloatField(editGroupFitnessExponent, gf);
+            parent->writeFloatField(editGroupFitnessCurvature, gf);
             groupfitIndex = j;
         }
         });
 
-    connect(&editGroupFitnessExponent, &QLineEdit::editingFinished, [this, parent]() {
+    connect(&editGroupFitnessCurvature, &QLineEdit::editingFinished, [this, parent]() {
         groupfitModified = true;
-        float gf = parent->readFloatField(editGroupFitnessExponent);
+        float gf = parent->readFloatField(editGroupFitnessCurvature);
 
         if (gf <= 0.0f) groupfitIndex = 0;
         else if (gf < 1.0f) groupfitIndex = 1;
@@ -1215,7 +1219,7 @@ FitnessDialogBox::FitnessDialogBox(Altruist *parent) :
             }
         }
         if (groupfitModified) {
-            d->fitExpo = parent->readFloatField(editGroupFitnessExponent);
+            d->groupFitCurvature = parent->readFloatField(editGroupFitnessCurvature);
             d->fitfunc = groupfitIndex;
         }
 
@@ -1484,7 +1488,7 @@ DataOutputDialogBox::DataOutputDialogBox(Altruist *parent) :
     labelModelSpecific("Model-specific data:"),
     labelMutations("Mutations:"),
     labelMigrants("Migrants:"),
-    labelAltruismDemes("Altruism groups:"),
+    labelAltruismGroups("Altruism groups:"),
     labelExtinctions("Extinctions:"),
     labelResult("Simulation result:"),
     labelSteadyState("Steady state:"),
@@ -1551,10 +1555,10 @@ DataOutputDialogBox::DataOutputDialogBox(Altruist *parent) :
     labelMigrants.setBuddy(&checkboxMigrants);
     checkboxMigrants.setChecked(parent->d.bOutOptions & 0x40);
 
-    dialogLayout.addWidget(&labelAltruismDemes, row, 2);
-    dialogLayout.addWidget(&checkboxAltruismDemes, row++, 3);
-    labelAltruismDemes.setBuddy(&checkboxAltruismDemes);
-    checkboxAltruismDemes.setChecked(parent->d.bOutOptions & 0x100);
+    dialogLayout.addWidget(&labelAltruismGroups, row, 2);
+    dialogLayout.addWidget(&checkboxAltruismGroups, row++, 3);
+    labelAltruismGroups.setBuddy(&checkboxAltruismGroups);
+    checkboxAltruismGroups.setChecked(parent->d.bOutOptions & 0x100);
 
     dialogLayout.addWidget(&labelExtinctions, row, 0);
     dialogLayout.addWidget(&checkboxExtinctions, row, 1);
@@ -1630,7 +1634,7 @@ DataOutputDialogBox::DataOutputDialogBox(Altruist *parent) :
         parent->d.bOutOptions |= (int)checkboxAltruists.isChecked() << 4;
         parent->d.bOutOptions |= (int)checkboxMutations.isChecked() << 5;
         parent->d.bOutOptions |= (int)checkboxMigrants.isChecked() << 6;
-        parent->d.bOutOptions |= (int)checkboxAltruismDemes.isChecked() << 8;
+        parent->d.bOutOptions |= (int)checkboxAltruismGroups.isChecked() << 8;
         parent->d.bOutOptions |= (int)checkboxExtinctions.isChecked() << 9;
         parent->d.bOutOptions |= (int)checkboxResult.isChecked() << 10;
         parent->d.bOutOptions |= (int)checkboxModelSpecific.isChecked() << 11;

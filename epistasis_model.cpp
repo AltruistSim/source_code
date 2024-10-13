@@ -1,8 +1,8 @@
 /***************************  epistasis_model.cpp   ***************************
 * Author:        Agner Fog
 * Date created:  1995-08-13
-* Last modified: 2023-12-31
-* Version:       3.00.00
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines a model of epistasis in a structured or viscous population.
@@ -34,10 +34,10 @@ static const ParameterDef epistasisParameterDefinitions[] {
     {0, 0, 0, 0}
 };
 
-// Deme structure, describing each deme or territory
-struct EpistasisDeme {
-    int32_t nn;              // number of individuals in deme
-    int32_t nmax;            // carrying capacity or max deme size
+// Group structure, describing each group or territory
+struct EpistasisGroup {
+    int32_t nn;              // number of individuals in group
+    int32_t nmax;            // carrying capacity or max group size
     int32_t gg[3][2];        // gene pool, locus A, B, C
     int32_t mutationAge[3];  // age of each mutant gene before combined with mutants at other loci
 };
@@ -48,22 +48,22 @@ const int locusC = 2;        // C locus
 
 
 /*
-struct DemeFieldDescriptor {
+struct GroupFieldDescriptor {
     int32_t type;            // 0: end of list, 
-                             // 1: size of Deme structure, 
+                             // 1: size of group structure, 
                              // 2: carrying capacity (max individuals)
                              // 3: population (number of individuals)
                              // 4: gene count, 
                              // 5: genotype or phenotype count
                              // 8: group property
     int32_t varType;         // varInt16 or varInt32 or varFloat
-    int32_t offset;          // offset into Deme structure
+    int32_t offset;          // offset into group structure
     int32_t statistic;       // 1: calculate sum, 2: calculate mean
                              // 4: possible stop criterion, stop when above certain value
                              // 8: possible stop criterion, stop when below certain value
     int32_t graphics;        // show in graphics display:
                              // 2:  max size
-                             // 3:  population. divide by max size or nMaxPerDeme to get relative size
+                             // 3:  population. divide by max size or nMaxPerGroup to get relative size
                              // 4:  area. divide by territorySizeMax to get relative size
                              // 10: gene count for mutant, primary locus
                              // 11: gene count for mutant, secondary locus
@@ -73,16 +73,16 @@ struct DemeFieldDescriptor {
 };
 */
 
-// List of fields in Deme structure
-static const DemeFieldDescriptor epistasisDemeDescriptors[] = {
-    {1, varInt32, sizeof(EpistasisDeme), 0, 0, 0},
-    {3, varInt32, demeFieldOffset(EpistasisDeme,nn),             0, 3,  "population"},
-    {4, varInt32, demeFieldOffset(EpistasisDeme,gg[locusA][0]),  8, 0,  "nonA gene"},
-    {4, varInt32, demeFieldOffset(EpistasisDeme,gg[locusA][1]),  5, 10, "A gene"},
-    {4, varInt32, demeFieldOffset(EpistasisDeme,gg[locusB][0]),  2, 0,  "nonB gene"},
-    {4, varInt32, demeFieldOffset(EpistasisDeme,gg[locusB][1]),  2, 11, "B gene"},
-    {4, varInt32, demeFieldOffset(EpistasisDeme,gg[locusC][0]),  2, 0,  "nonC gene"},
-    {4, varInt32, demeFieldOffset(EpistasisDeme,gg[locusC][1]),  2, 12, "C gene"},
+// List of fields in group structure
+static const GroupFieldDescriptor epistasisGroupDescriptors[] = {
+    {1, varInt32, sizeof(EpistasisGroup), 0, 0, 0},
+    {3, varInt32, groupFieldOffset(EpistasisGroup,nn),             0, 3,  "population"},
+    {4, varInt32, groupFieldOffset(EpistasisGroup,gg[locusA][0]),  8, 0,  "nonA gene"},
+    {4, varInt32, groupFieldOffset(EpistasisGroup,gg[locusA][1]),  5, 10, "A gene"},
+    {4, varInt32, groupFieldOffset(EpistasisGroup,gg[locusB][0]),  2, 0,  "nonB gene"},
+    {4, varInt32, groupFieldOffset(EpistasisGroup,gg[locusB][1]),  2, 11, "B gene"},
+    {4, varInt32, groupFieldOffset(EpistasisGroup,gg[locusC][0]),  2, 0,  "nonC gene"},
+    {4, varInt32, groupFieldOffset(EpistasisGroup,gg[locusC][1]),  2, 12, "C gene"},
     {0, 0, 0, 0, 0, 0}   // mark end of list
 };
 
@@ -95,7 +95,7 @@ static const ModelDescriptor epistasisModel = {
     "Evolution through punctuated equilibria may happen when two genes have to be "
     "combined before a gain in fitness occurs, while each gene alone is reducing the fitness.",
     epistasisParameterDefinitions,
-    epistasisDemeDescriptors,
+    epistasisGroupDescriptors,
     &epistasisInitFunction,
     &epistasisGenerationFunction
 };
@@ -130,8 +130,8 @@ void epistasisInitFunction(AltruData * d, int state) {
         // model version
         d->modelVersionMajor = 3;
         d->modelVersionMinor = 0;
-        d->modelDemeStructureSize = sizeof(EpistasisDeme);
-        d->modelPopOffset = demeFieldOffset(EpistasisDeme,nn);
+        d->modelGroupStructureSize = sizeof(EpistasisGroup);
+        d->modelPopOffset = groupFieldOffset(EpistasisGroup,nn);
 
         // define names
         d->sLocusName[locusA] = "A";
@@ -185,27 +185,27 @@ void epistasisInitFunction(AltruData * d, int state) {
     }
 }
 
-static void errorCheck(AltruData * d, EpistasisDeme * deme) {
-    // check deme data for consistency
+static void errorCheck(AltruData * d, EpistasisGroup * group) {
+    // check group data for consistency
     char text[64];
-    int ideme = deme - (EpistasisDeme*)(d->demeData);
+    int igroup = group - (EpistasisGroup*)(d->groupData);
 
-    if (deme->gg[locusC][0] + deme->gg[locusC][1] != 0 && !d->locusUsed[locusC]) {
+    if (group->gg[locusC][0] + group->gg[locusC][1] != 0 && !d->locusUsed[locusC]) {
         errors.reportError("unused locus != 0");
     }
 
-    if (deme->gg[locusA][0] < 0 || deme->gg[locusA][1] < 0
-        || deme->gg[locusA][0] + deme->gg[locusA][1] != deme->nn * 2
-        || (deme->gg[locusA][0] + deme->gg[locusA][1] & 1)) {
-        sprintf_s(text, "error generation %i, deme %i, nn %i, ggA %i %i",
-            (int)d->generations, ideme,
-            deme->nn, deme->gg[locusA][0], deme->gg[locusA][1]);
+    if (group->gg[locusA][0] < 0 || group->gg[locusA][1] < 0
+        || group->gg[locusA][0] + group->gg[locusA][1] != group->nn * 2
+        || (group->gg[locusA][0] + group->gg[locusA][1] & 1)) {
+        sprintf_s(text, "error generation %i, group %i, nn %i, ggA %i %i",
+            (int)d->generations, igroup,
+            group->nn, group->gg[locusA][0], group->gg[locusA][1]);
         errors.reportError(text);
     }
-    if ((d->locusUsed[locusB] && deme->gg[locusB][0] + deme->gg[locusB][1] != deme->nn * 2) ||
-        (d->locusUsed[locusC] && deme->gg[locusC][0] + deme->gg[locusC][1] != deme->nn * 2)) {
+    if ((d->locusUsed[locusB] && group->gg[locusB][0] + group->gg[locusB][1] != group->nn * 2) ||
+        (d->locusUsed[locusC] && group->gg[locusC][0] + group->gg[locusC][1] != group->nn * 2)) {
         sprintf_s(text, "error nn %i, ggB %i %i, ggC %i %i",
-            deme->nn, deme->gg[locusB][0], deme->gg[locusB][1], deme->gg[locusC][0], deme->gg[locusC][1]);
+            group->nn, group->gg[locusB][0], group->gg[locusB][1], group->gg[locusC][0], group->gg[locusC][1]);
         errors.reportError(text);
     }
 }
@@ -287,7 +287,7 @@ static void fitnessOfGenotypes(AltruData * d, double fitness[]) {
 }
 
 // stochastic division of a gene pool of three biallelic loci into all 27 possible genotypes
-static void genePool2Genotypes(AltruData * d, EpistasisDeme * deme, int32_t genotypes[27]) {
+static void genePool2Genotypes(AltruData * d, EpistasisGroup * group, int32_t genotypes[27]) {
     int32_t genoA[3];                  // genotypes of each combination at A locus
     int32_t genoB[3];                  // genotypes of each combination at B locus
     int32_t genoC[3] = {0,0,0};        // genotypes of each combination at C locus
@@ -295,31 +295,31 @@ static void genePool2Genotypes(AltruData * d, EpistasisDeme * deme, int32_t geno
     int i;
 
     for (i = 0; i < 27; i++) genotypes[i] = 0;   // reset all genotypes
-    if (deme->gg[locusC][1] == 0) {
+    if (group->gg[locusC][1] == 0) {
         // shortcut for no C mutants
-        if (deme->gg[locusB][1] == 0) {
+        if (group->gg[locusB][1] == 0) {
             // shortcut for no B mutants
-            if (deme->gg[locusA][1] == 0) {
+            if (group->gg[locusA][1] == 0) {
                 // no mutants at all
-                genotypes[0] = deme->gg[locusA][0] / 2u;
+                genotypes[0] = group->gg[locusA][0] / 2u;
             }
             else {
                 // only A mutants
-                combineGenes(deme->gg[locusA], genoA, d->ran);
+                combineGenes(group->gg[locusA], genoA, d->ran);
                 for (i = 0; i < 3; i++) genotypes[i] = genoA[i];
             }
         }
-        else if (deme->gg[locusA][1] == 0) {
+        else if (group->gg[locusA][1] == 0) {
             // only B mutants
-            combineGenes(deme->gg[locusB], genoB, d->ran);
+            combineGenes(group->gg[locusB], genoB, d->ran);
             for (i = 0; i < 3; i++) genotypes[i*3] = genoB[i];
         }
         else {
             // A and B mutants, no C mutants
             // get genotypes of each combination at A locus:
-            combineGenes(deme->gg[locusA], genoA, d->ran);
+            combineGenes(group->gg[locusA], genoA, d->ran);
             // get genotypes of each combination at B locus:
-            combineGenes(deme->gg[locusB], genoB, d->ran);
+            combineGenes(group->gg[locusB], genoB, d->ran);
             // distribute (0,0) at B locus into all combinations at A locus
             d->ran->multiHypergeometric(genotypes, genoA, genoB[0], 3);
             // calculate remaining A genotypes
@@ -334,11 +334,11 @@ static void genePool2Genotypes(AltruData * d, EpistasisDeme * deme, int32_t geno
         // both A, B, and C mutants
         // (We are making no shortcut for C and no A or no B, because this is rare)
         // get genotypes of each combination at A locus:
-        combineGenes(deme->gg[locusA], genoA, d->ran);
+        combineGenes(group->gg[locusA], genoA, d->ran);
         // get genotypes of each combination at B locus:
-        combineGenes(deme->gg[locusB], genoB, d->ran);
+        combineGenes(group->gg[locusB], genoB, d->ran);
         // get genotypes of each combination at C locus:
-        combineGenes(deme->gg[locusC], genoC, d->ran);
+        combineGenes(group->gg[locusC], genoC, d->ran);
         // distribute (0,0) at B locus into all combinations at A locus
         d->ran->multiHypergeometric(genoAB, genoA, genoB[0], 3);
         // calculate remaining A genotypes
@@ -367,7 +367,7 @@ static void genePool2Genotypes(AltruData * d, EpistasisDeme * deme, int32_t geno
     // totalPhenotypes[4] : A and B, no C
     // totalPhenotypes[5] : A and B and C
     // totalPhenotypes[6] : all other combinations
-    if (deme->gg[locusC][1] == 0) {
+    if (group->gg[locusC][1] == 0) {
         for (int i = 0; i < 9; i++) {
             genoAB[i] = genotypes[i];  // get genoAB if not given above
         }
@@ -403,20 +403,20 @@ static void genePool2Genotypes(AltruData * d, EpistasisDeme * deme, int32_t geno
             phenoAB[3] += genoAB[4] + genoAB[5] + genoAB[7];
         }    
     }
-    if (d->locusUsed[locusC] && genoC[1] + genoC[2] && deme->nn) {
+    if (d->locusUsed[locusC] && genoC[1] + genoC[2] && group->nn) {
         // C present
         int c, ac, bc, abc;
         if (d->dominance[locusC] == recessive) {           // C recessive
-            c   = phenoAB[0] * genoC[2] / deme->nn;        // C only
-            ac  = phenoAB[1] * genoC[2] / deme->nn;        // C and A
-            bc  = phenoAB[2] * genoC[2] / deme->nn;        // C and B
-            abc = phenoAB[3] * genoC[2] / deme->nn;        // ABC
+            c   = phenoAB[0] * genoC[2] / group->nn;        // C only
+            ac  = phenoAB[1] * genoC[2] / group->nn;        // C and A
+            bc  = phenoAB[2] * genoC[2] / group->nn;        // C and B
+            abc = phenoAB[3] * genoC[2] / group->nn;        // ABC
         }
         else {   // C dominant
-            c   = phenoAB[0] * (genoC[1] + genoC[2]) / deme->nn;
-            ac  = phenoAB[1] * (genoC[1] + genoC[2]) / deme->nn;
-            bc  = phenoAB[2] * (genoC[1] + genoC[2]) / deme->nn;
-            abc = phenoAB[3] * (genoC[1] + genoC[2]) / deme->nn;
+            c   = phenoAB[0] * (genoC[1] + genoC[2]) / group->nn;
+            ac  = phenoAB[1] * (genoC[1] + genoC[2]) / group->nn;
+            bc  = phenoAB[2] * (genoC[1] + genoC[2]) / group->nn;
+            abc = phenoAB[3] * (genoC[1] + genoC[2]) / group->nn;
         }
         d->totalPhenotypes[0] += phenoAB[0] - c;
         d->totalPhenotypes[1] += phenoAB[1] - ac;
@@ -424,7 +424,7 @@ static void genePool2Genotypes(AltruData * d, EpistasisDeme * deme, int32_t geno
         d->totalPhenotypes[3] += c;
         d->totalPhenotypes[4] += phenoAB[3] - abc;
         d->totalPhenotypes[5] += abc;
-        int other = deme->nn - c - ac - bc - abc;
+        int other = group->nn - c - ac - bc - abc;
         if (other > 0) d->totalPhenotypes[6] += other;
     }
     else {
@@ -437,8 +437,8 @@ static void genePool2Genotypes(AltruData * d, EpistasisDeme * deme, int32_t geno
 }
 
 // reduce all 27 possible genotypes of three biallelic loci into a gene pool
-static void genotypes2GenePool(AltruData * d, int32_t genotypes[27], EpistasisDeme * deme) {
-    for (int i = 0; i < 3; i++) deme->gg[i][0] = deme->gg[i][1] = 0; // reset all
+static void genotypes2GenePool(AltruData * d, int32_t genotypes[27], EpistasisGroup * group) {
+    for (int i = 0; i < 3; i++) group->gg[i][0] = group->gg[i][1] = 0; // reset all
     for (int ia = 0; ia < 3; ia++) {                       // loop through locus A genotypes
         for (int ib = 0; ib < 3; ib++) {                   // loop through locus B genotypes
             for (int ic = 0; ic < 3; ic++) {               // loop through locus C genotypes
@@ -446,51 +446,51 @@ static void genotypes2GenePool(AltruData * d, int32_t genotypes[27], EpistasisDe
                 int32_t g0, g1;                            // randomize genes for offspring of heterozygotes
                 switch (ia) {
                 case 0:
-                    deme->gg[0][0] += genotypes[j] * 2;
+                    group->gg[0][0] += genotypes[j] * 2;
                     break;
                 case 1:
                     g0 = d->ran->binomial(genotypes[j] * 2, 0.5);
                     g1 = genotypes[j] * 2 - g0;
-                    deme->gg[0][0] += g0;
-                    deme->gg[0][1] += g1;
+                    group->gg[0][0] += g0;
+                    group->gg[0][1] += g1;
                     break;
                 case 2:
-                    deme->gg[0][1] += genotypes[j] * 2;
+                    group->gg[0][1] += genotypes[j] * 2;
                     break;
                 }
                 switch (ib) {
                 case 0:
-                    deme->gg[1][0] += genotypes[j] * 2;
+                    group->gg[1][0] += genotypes[j] * 2;
                     break;
                 case 1:
                     g0 = d->ran->binomial(genotypes[j] * 2, 0.5);
                     g1 = genotypes[j] * 2 - g0;
-                    deme->gg[1][0] += g0;
-                    deme->gg[1][1] += g1;
+                    group->gg[1][0] += g0;
+                    group->gg[1][1] += g1;
                     break;
                 case 2:
-                    deme->gg[1][1] += genotypes[j] * 2;
+                    group->gg[1][1] += genotypes[j] * 2;
                     break;
                 }
                 if (!d->locusUsed[2]) break;     // locus C not used
                 switch (ic) {
                 case 0:
-                    deme->gg[2][0] += genotypes[j] * 2;
+                    group->gg[2][0] += genotypes[j] * 2;
                     break;
                 case 1:
                     g0 = d->ran->binomial(genotypes[j] * 2, 0.5);
                     g1 = genotypes[j] * 2 - g0;
-                    deme->gg[2][0] += g0;
-                    deme->gg[2][1] += g1;
+                    group->gg[2][0] += g0;
+                    group->gg[2][1] += g1;
                     break;
                 case 2:
-                    deme->gg[2][1] += genotypes[j] * 2;
+                    group->gg[2][1] += genotypes[j] * 2;
                     break;
                 }
             }
         }
     }
-    deme->nn = (deme->gg[0][0] + deme->gg[0][1]) / 2u;
+    group->nn = (group->gg[0][0] + group->gg[0][1]) / 2u;
 }
 
 
@@ -503,65 +503,65 @@ viability selection, population regulation, migration
 ******************************************************************************/
 
 void epistasisGenerationFunction(AltruData * d, int state) {
-    int32_t ideme;                                         // deme index
-    EpistasisDeme * deme;                                  // point to deme
+    int32_t igroup;                                        // group index
+    EpistasisGroup * group;                                // point to group
     int32_t genotypes[27];                                 // individuals of each genotype
     double fitness[27];                                    // fitness of each genotype
     int32_t neighbors[8];                                  // list of neighbor islands
     int numNeighbors;                                      // number of neighbor islands
     int32_t iNeighbor;                                     // index to neighbor islands
-    EpistasisDeme * neighborDeme = 0;                      // pointer to neighbor deme
+    EpistasisGroup * neighborGroup = 0;                    // pointer to neighbor group
 
     // check allocated memory
-    if (d->demeData == 0) return;
+    if (d->groupData == 0) return;
 
     if (state == state_start) {                            // initialization
 
         // initialize statistics variables
         statisticsInit0(d);
 
-        // initialize demes
+        // initialize groups
         d->nIslands = d->maxIslands;
 
-        for (ideme = 0; ideme < d->nIslands; ideme++) {
-            deme = (EpistasisDeme*)(d->demeData) + ideme;  // point to current deme
+        for (igroup = 0; igroup < d->nIslands; igroup++) {
+            group = (EpistasisGroup*)(d->groupData) + igroup;  // point to current group
             // randomize island size
             int32_t populationSize;
             if (d->carryingCapacityStandardDeviation > 0.) {
                 // randomize carrying capacity
-                double upperLimit = d->nMaxPerDeme + d->carryingCapacityStandardDeviation * 7.;
-                if (upperLimit > 16000.) upperLimit = d->carryingCapacity[0] + 10000.;
-                populationSize = (int)lround(d->ran->normalTrunc(d->carryingCapacity[0], d->carryingCapacityStandardDeviation, 0., upperLimit));
+                double upperLimit = d->nMaxPerGroup + d->carryingCapacityStandardDeviation * 7.;
+                if (upperLimit > 16000.) upperLimit = d->nMaxPerGroup + 10000.;
+                populationSize = (int)lround(d->ran->normalTrunc(d->nMaxPerGroup, d->carryingCapacityStandardDeviation, 0., upperLimit));
                 if (populationSize < d->minGroupSize) populationSize = d->minGroupSize;
             }
             else {
                 // constant carrying capacity
-                populationSize = d->nMaxPerDeme;
+                populationSize = d->nMaxPerGroup;
             }
-            deme->nmax = populationSize;
+            group->nmax = populationSize;
             // populate island
-            deme->nn = d->ran->poisson(deme->nmax / 2);    // random population size
-            if (deme->nn > deme->nmax) deme->nn = deme->nmax; // limit population
-            if (deme->nn < d->minGroupSize) deme->nn = d->minGroupSize; 
+            group->nn = d->ran->poisson(group->nmax / 2);    // random population size
+            if (group->nn > group->nmax) group->nn = group->nmax; // limit population
+            if (group->nn < d->minGroupSize) group->nn = d->minGroupSize; 
             // random gene pool of island
             for (int locus = 0; locus < d->nLoci; locus++) {
                 if (d->locusUsed[locus]) {
-                    deme->gg[locus][1] = d->ran->binomial(deme->nn * 2, d->fg0[locus]); // number of wild type genes
-                    deme->gg[locus][0] = deme->nn * 2 - deme->gg[locus][1];             // number of mutant genes 
+                    group->gg[locus][1] = d->ran->binomial(group->nn * 2, d->fg0[locus]); // number of wild type genes
+                    group->gg[locus][0] = group->nn * 2 - group->gg[locus][1];             // number of mutant genes 
                 }
                 else {
-                    deme->gg[locus][0] = deme->gg[locus][1] = 0;
+                    group->gg[locus][0] = group->gg[locus][1] = 0;
                 }
-                deme->mutationAge[locus] = 0;
+                group->mutationAge[locus] = 0;
             }
-            errorCheck(d, deme);
+            errorCheck(d, group);
         }
         // reset migrant pool
-        deme = (EpistasisDeme*)(d->demeData) + d->maxIslands;
-        deme->nmax = deme->nn = 0;
+        group = (EpistasisGroup*)(d->groupData) + d->maxIslands;
+        group->nmax = group->nn = 0;
         for (int locus = 0; locus < 3; locus++) {
-            deme->gg[locus][0] = deme->gg[locus][1] = 0;
-            deme->mutationAge[locus] = 0;
+            group->gg[locus][0] = group->gg[locus][1] = 0;
+            group->mutationAge[locus] = 0;
         }
 
         // start running
@@ -587,24 +587,24 @@ void epistasisGenerationFunction(AltruData * d, int state) {
         int const numGenotypes = d->locusUsed[locusC] ? 27 : 9; // number of possible genotypees
         int const numUsedLoci  = d->locusUsed[locusC] ? 3 : 2;  // number of loci in use
 
-        // deme loop 1: mutation, growth, selection
-        for (ideme = 0; ideme < d->nIslands; ideme++) {
-            deme = (EpistasisDeme*)(d->demeData) + ideme;       // point to current deme
+        // group loop 1: mutation, growth, selection
+        for (igroup = 0; igroup < d->nIslands; igroup++) {
+            group = (EpistasisGroup*)(d->groupData) + igroup;       // point to current group
 
-            errorCheck(d, deme);
+            errorCheck(d, group);
 
             // mutation
             for (int locus = 0; locus < numUsedLoci; locus++) {
                 if (d->locusUsed[locus]) {
-                    int32_t forwardMutations  = d->ran->binomial(deme->gg[locus][0], d->murate[locus][0]);
-                    int32_t backwardMutations = d->ran->binomial(deme->gg[locus][1], d->murate[locus][1]);
-                    deme->gg[locus][1] += forwardMutations - backwardMutations;
-                    deme->gg[locus][0] -= forwardMutations - backwardMutations;
+                    int32_t forwardMutations  = d->ran->binomial(group->gg[locus][0], d->murate[locus][0]);
+                    int32_t backwardMutations = d->ran->binomial(group->gg[locus][1], d->murate[locus][1]);
+                    group->gg[locus][1] += forwardMutations - backwardMutations;
+                    group->gg[locus][0] -= forwardMutations - backwardMutations;
                     d->mutations[locus][0] += forwardMutations;
                     d->mutations[locus][1] += backwardMutations;
                     // set mutation age
-                    if (forwardMutations && deme->gg[locus][1] && deme->mutationAge[locus] == 0) {
-                        deme->mutationAge[locus] = 1; // new mutation
+                    if (forwardMutations && group->gg[locus][1] && group->mutationAge[locus] == 0) {
+                        group->mutationAge[locus] = 1; // new mutation
                     }
                 }
             }
@@ -612,29 +612,29 @@ void epistasisGenerationFunction(AltruData * d, int state) {
             // reproduction and growth
             if (d->selectionModel == selectionFecundity) {
 
-                // split deme genes into 27 possible genotype combinations
-                genePool2Genotypes(d, deme, genotypes);
+                // split group genes into 27 possible genotype combinations
+                genePool2Genotypes(d, group, genotypes);
 
                 // growth of each genotype
                 for (int g = 0; g < numGenotypes; g++) {
                     genotypes[g] = d->ran->poisson(genotypes[g] * fitness[g]);
                 }
 
-                // new deme gene pool
-                genotypes2GenePool(d, genotypes, deme);
+                // new group gene pool
+                genotypes2GenePool(d, genotypes, group);
             }
             else {
                 errors.reportError("other selection model not supported for epistasis");
             }
         }
 
-        // deme loop 2: migration
-        for (ideme = 0; ideme < d->nIslands; ideme++) {
-            deme = (EpistasisDeme*)(d->demeData) + ideme;       // point to current deme
+        // group loop 2: migration and population control
+        for (igroup = 0; igroup < d->nIslands; igroup++) {
+            group = (EpistasisGroup*)(d->groupData) + igroup;       // point to current group
 
-            errorCheck(d, deme);
+            errorCheck(d, group);
 
-            numNeighbors = findNeighbors(d, ideme, neighbors);  // find neighbor demes
+            numNeighbors = findNeighbors(d, igroup, neighbors);  // find neighbor groups
 
             if (numNeighbors || d->immigrationPattern == immigrationCommonPool) {
                 // immigrate
@@ -643,90 +643,90 @@ void epistasisGenerationFunction(AltruData * d, int state) {
                 int32_t numMigrants = 0;                        // number of immigrants
                 if (d->immigrationPattern == immigrationCommonPool) {
                     // migrants come from common pool
-                    neighborDeme = (EpistasisDeme*)(d->demeData) + d->maxIslands; // point to common pool
+                    neighborGroup = (EpistasisGroup*)(d->groupData) + d->maxIslands; // point to common pool
                 }
                 else if (d->immigrationPattern == immigrationRandomGroup) {
                     int migrantSource = d->ran->iRandom(0, d->maxIslands - 2);
-                    if (migrantSource >= ideme) migrantSource++;                  // don't migrate from same deme
-                    neighborDeme = (EpistasisDeme*)(d->demeData) + migrantSource;
+                    if (migrantSource >= igroup) migrantSource++;                  // don't migrate from same group
+                    neighborGroup = (EpistasisGroup*)(d->groupData) + migrantSource;
                 }
                 else {
                     // migrants come from random neighbor
-                    iNeighbor = d->ran->iRandom(0, numNeighbors - 1);             // find random neighbor deme
-                    neighborDeme = (EpistasisDeme*)(d->demeData) + neighbors[iNeighbor]; // point to neighbor deme
+                    iNeighbor = d->ran->iRandom(0, numNeighbors - 1);             // find random neighbor group
+                    neighborGroup = (EpistasisGroup*)(d->groupData) + neighbors[iNeighbor]; // point to neighbor group
                 }
 
                 switch (d->immigrationPattern) {
                 case immigrationCommonPool:      // from common pool
-                case immigrationNeighbor:        // from random neighbor deme
-                case immigrationRandomGroup:     // from random deme
-                    numMigrants = d->ran->poisson(migrationRate * deme->nmax);
+                case immigrationNeighbor:        // from random neighbor group
+                case immigrationRandomGroup:     // from random group
+                    numMigrants = d->ran->poisson(migrationRate * group->nmax);
                     break;
                 case immigrationProportional:    // prop. w. population, from neighbor
-                    numMigrants = d->ran->poisson(migrationRate * deme->nn);
+                    numMigrants = d->ran->poisson(migrationRate * group->nn);
                     break;
                 case immigrationVacant:          // prop. w. vacant capacity, from neighbor
-                    numMigrants = d->ran->poisson(migrationRate * (deme->nmax - deme->nn + 1));
+                    numMigrants = d->ran->poisson(migrationRate * (group->nmax - group->nn + 1));
                     break;
                 }
 
                 if (numNeighbors > 0 && numMigrants > 0) {
-                    if (numMigrants > neighborDeme->nn) numMigrants = neighborDeme->nn;
+                    if (numMigrants > neighborGroup->nn) numMigrants = neighborGroup->nn;
                     // select migrant genes
                     for (int locus = 0; locus < numUsedLoci; locus++) {
-                        int32_t gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborDeme->gg[locus][0], neighborDeme->nn * 2);
+                        int32_t gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborGroup->gg[locus][0], neighborGroup->nn * 2);
                         int32_t gmig1 = numMigrants * 2 - gmig0;
-                        deme->gg[locus][0] += gmig0;          // add migrant genes to current deme
-                        deme->gg[locus][1] += gmig1;
-                        neighborDeme->gg[locus][0] -= gmig0;  // subtract migrant genes from neighbor deme
-                        neighborDeme->gg[locus][1] -= gmig1;
+                        group->gg[locus][0] += gmig0;          // add migrant genes to current group
+                        group->gg[locus][1] += gmig1;
+                        neighborGroup->gg[locus][0] -= gmig0;  // subtract migrant genes from neighbor group
+                        neighborGroup->gg[locus][1] -= gmig1;
                         // transfer mutation age if mutant gene transferred
-                        if (gmig1 && neighborDeme->mutationAge[locus] && !deme->mutationAge[locus]) {
-                            deme->mutationAge[locus] = neighborDeme->mutationAge[locus];
+                        if (gmig1 && neighborGroup->mutationAge[locus] && !group->mutationAge[locus]) {
+                            group->mutationAge[locus] = neighborGroup->mutationAge[locus];
                         }
                     }
-                    deme->nn += numMigrants;
-                    neighborDeme->nn -= numMigrants;
+                    group->nn += numMigrants;
+                    neighborGroup->nn -= numMigrants;
                     d->migrantsTot += numMigrants;  // count total number of migrants
                 }
 
                 // limit population to carrying capacity
-                int32_t nn = deme->nn;
-                if (nn > deme->nmax) {
+                int32_t nn = group->nn;
+                if (nn > group->nmax) {
                     for (int locus = 0; locus < numUsedLoci; locus++) {
-                        int32_t gn = d->ran->hypergeometric(2 * deme->nmax, deme->gg[locus][0], 2 * nn);
-                        int32_t ga = 2 * deme->nmax - gn;
-                        deme->gg[locus][0] = gn;
-                        deme->gg[locus][1] = ga;
+                        int32_t gn = d->ran->hypergeometric(2 * group->nmax, group->gg[locus][0], 2 * nn);
+                        int32_t ga = 2 * group->nmax - gn;
+                        group->gg[locus][0] = gn;
+                        group->gg[locus][1] = ga;
                     }
-                    deme->nn = deme->nmax;
+                    group->nn = group->nmax;
                 }
             }
 
             // update mutationAge
             for (int locus = 0; locus < numUsedLoci; locus++) {
-                if (deme->gg[locus][1] == 0) deme->mutationAge[locus] = 0; // reset mutationAge if mutation died
+                if (group->gg[locus][1] == 0) group->mutationAge[locus] = 0; // reset mutationAge if mutation died
             }
             // update mutationAge for each locus until it meets mutation at other locus
-            if (deme->mutationAge[locusA] && !deme->mutationAge[locusB]) deme->mutationAge[locusA]++;
-            if (deme->mutationAge[locusB] && !deme->mutationAge[locusA]) deme->mutationAge[locusB]++;
-            if (deme->mutationAge[locusC] && !(deme->mutationAge[locusA] && deme->mutationAge[locusB])) deme->mutationAge[locusC]++;
+            if (group->mutationAge[locusA] && !group->mutationAge[locusB]) group->mutationAge[locusA]++;
+            if (group->mutationAge[locusB] && !group->mutationAge[locusA]) group->mutationAge[locusB]++;
+            if (group->mutationAge[locusC] && !(group->mutationAge[locusA] && group->mutationAge[locusB])) group->mutationAge[locusC]++;
         }
 
-        // deme loop 3: update global gene pool and statistics
-        for (ideme = 0; ideme < d->nIslands; ideme++) {
-            deme = (EpistasisDeme*)(d->demeData) + ideme;     // point to current deme
+        // group loop 3: update global gene pool and statistics
+        for (igroup = 0; igroup < d->nIslands; igroup++) {
+            group = (EpistasisGroup*)(d->groupData) + igroup;     // point to current group
             for (int locus = 0; locus < numUsedLoci; locus++) {
-                d->genePool[locus][0] += deme->gg[locus][0];
-                d->genePool[locus][1] += deme->gg[locus][1];
+                d->genePool[locus][0] += group->gg[locus][0];
+                d->genePool[locus][1] += group->gg[locus][1];
             }
-            d->totalPopulation += deme->nn;
+            d->totalPopulation += group->nn;
         }
 
         // make migrant pool
         if (d->migrationTopology == topologyCommonPool) {  // migrant pool used
             // migrant pool placed last in memory block
-            EpistasisDeme * migrantPool = (EpistasisDeme*)(d->demeData) + d->maxIslands;
+            EpistasisGroup * migrantPool = (EpistasisGroup*)(d->groupData) + d->maxIslands;
             double reduction = 1.;
             if (d->totalPopulation > 100000000) {  // avoid overflow
                 reduction = 100000000. / d->totalPopulation;
@@ -755,8 +755,8 @@ void epistasisGenerationFunction(AltruData * d, int state) {
         // user data for phenotypes
         for (int i = 0; i < 7; i++) d->userData[i+3].f = d->totalPhenotypes[i];
         // user data for mutation age
-        deme = (EpistasisDeme*)(d->demeData) + d->nIslands/2;     // point to arbitrary deme
-        for (int i = locusA; i <= locusC; i++) d->userData[i].i = deme->mutationAge[i];
+        group = (EpistasisGroup*)(d->groupData) + d->nIslands/2;     // point to arbitrary group
+        for (int i = locusA; i <= locusC; i++) d->userData[i].i = group->mutationAge[i];
 
         // check if finished
         checkStopCriterion(d);

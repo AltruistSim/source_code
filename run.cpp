@@ -1,8 +1,8 @@
 /******************************  run.cpp   ************************************
 * Author:        Agner Fog
 * Date created:  2023-03-27
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the overhead of running a model, including generation
@@ -27,20 +27,20 @@ void Altruist::run() {
     if (state == state_idle || state == state_stop || d.parametersChanged) {
         d.currentModel = (models.getModel(d.iModel));      // get model descriptor
         // calculate necessary memory
-        d.demeStructureSize = d.modelDemeStructureSize;    // redundant
-        if (d.currentModel->demeFields[0].type != 1) {
-            errorMessage("Model code fails to define deme size"); return;
+        d.groupStructureSize = d.modelGroupStructureSize;    // redundant
+        if (d.currentModel->groupFields[0].type != 1) {
+            errorMessage("Model code fails to define group size"); return;
         } 
         else {
-            d.demeStructureSize = d.currentModel->demeFields[0].offset;
+            d.groupStructureSize = d.currentModel->groupFields[0].offset;
         }
         // calculate required memory for maxIslands. Add 1 for migrant pool or unused record 0
-        uint64_t requiredMemory = (d.maxIslands + 1) * d.demeStructureSize;
+        uint64_t requiredMemory = (d.maxIslands + 1) * d.groupStructureSize;
         if (d.bufferSize < requiredMemory) {
             // must allocate memory
-            if (d.bufferSize > 0) delete[] d.demeData;     // free previously allocated memory
-            d.demeData = new int8_t[requiredMemory]();     // () means initialize to zero (C++ 11)
-            if (d.demeData == 0) {
+            if (d.bufferSize > 0) delete[] d.groupData;     // free previously allocated memory
+            d.groupData = new int8_t[requiredMemory]();     // () means initialize to zero (C++ 11)
+            if (d.groupData == 0) {
                 errorMessage("Memory allocation failed"); return;
             }
             else {            
@@ -158,16 +158,16 @@ void Altruist::checkIfParametersChanged() {
     if (d.parametersChanged && state > state_idle && state < state_stop) {
         // parameters have changed while running
         // check memory requirement
-        uint64_t requiredMemory = (d.maxIslands + 1) * d.demeStructureSize;
+        uint64_t requiredMemory = (d.maxIslands + 1) * d.groupStructureSize;
         if (requiredMemory > d.bufferSize) {
             // must allocate more memory
             int8_t * newBuffer = new int8_t[requiredMemory]();
             if (newBuffer == 0) {
                 errorMessage("Memory allocation failed"); return;
-                d.maxIslands = d.bufferSize / d.demeStructureSize;
+                d.maxIslands = d.bufferSize / d.groupStructureSize;
                 return;
             }
-            int8_t * oldBuffer = d.demeData;
+            int8_t * oldBuffer = d.groupData;
             memcpy (newBuffer, oldBuffer, d.bufferSize);   // copy old data to new buffer
             delete[] oldBuffer;                            // delete old buffer
             d.bufferSize = requiredMemory;                 // set new buffer size
@@ -378,12 +378,11 @@ void statisticsInit1(AltruData * d) {
         d->totalPhenotypes[i] = 0;
         d->genePool[i][0] = d->genePool[i][1] = 0;
     }
-    d->demesDied = 0;
+    d->groupsDied = 0;
     d->migrantsTot = 0;
     d->totalPopulation = 0;
-    d->inhabitedDemes = 0;
-    d->altruistDemes = 0;
-    //d->egoistDemes = 0;
+    d->inhabitedGroups = 0;
+    d->altruistGroups = 0;
     d->stopCause = stopCauseNone;
     d->sumExtinctions = 0;
 }
@@ -405,7 +404,7 @@ void statisticsUpdate(AltruData * d) {
             d->geneFraction[i] = 0.f;
         }
     }
-    d->sumExtinctions += d->demesDied;
+    d->sumExtinctions += d->groupsDied;
     d->sumMigrants += d->migrantsTot;
 }
 
@@ -503,21 +502,21 @@ void checkStopCriterion(AltruData * d) {
 
 
 
-void addNeighbor(AltruData * d, int32_t deme, int32_t neighbors[], int & n) {
+void addNeighbor(AltruData * d, int32_t group, int32_t neighbors[], int & n) {
     // used by function findNeighbors to add a neighbor island to a list, unless it is empty
-    if (*(int32_t*)(d->demeData + deme * d->modelDemeStructureSize + d->modelPopOffset) != 0) { // check if not empty
-        neighbors[n++] = deme;
+    if (*(int32_t*)(d->groupData + group * d->modelGroupStructureSize + d->modelPopOffset) != 0) { // check if not empty
+        neighbors[n++] = group;
     }
 }
 
-int findNeighbors(AltruData * d, int32_t deme, int32_t neighbors[]) {
-    // find all (inhabited) neighbors to a deme, according to migration topology
-    if (d->modelDemeStructureSize == 0) return 0;          // escape if not initialized
+int findNeighbors(AltruData * d, int32_t group, int32_t neighbors[]) {
+    // find all (inhabited) neighbors to a group, according to migration topology
+    if (d->modelGroupStructureSize == 0) return 0;          // escape if not initialized
     switch (d->maxIslands) {        
     case 1: 
         return 0;                                          // there are no neighbors
     case 2:
-        neighbors[0] = 1-deme;
+        neighbors[0] = 1-group;
         return 1;                                          // there is only one neighbor
     default:
         break;                                             // there is more than 1 neighbor
@@ -526,8 +525,8 @@ int findNeighbors(AltruData * d, int32_t deme, int32_t neighbors[]) {
         d->rowLength = d->maxIslands / 2;                  // only two rows 
     }
 
-    int32_t row = uint32_t(deme) / uint32_t(d->rowLength); // row number
-    int32_t coloumn = deme - row * d->rowLength;           // column number
+    int32_t row = uint32_t(group) / uint32_t(d->rowLength); // row number
+    int32_t coloumn = group - row * d->rowLength;           // column number
     int32_t lastRow = uint32_t(d->maxIslands - 1) / uint32_t(d->rowLength) - 1; // last row
 
     int n = 0;  // count number of neighbors
@@ -536,81 +535,81 @@ int findNeighbors(AltruData * d, int32_t deme, int32_t neighbors[]) {
     switch (d->migrationTopology) {
 
     case topologyLinear:  // linear organization
-        if (deme > 0) addNeighbor(d, deme - 1, neighbors, n);                  // left neighbor
-        if (deme < d->maxIslands-1) addNeighbor(d, deme + 1, neighbors, n);    // right neighbor
+        if (group > 0) addNeighbor(d, group - 1, neighbors, n);                  // left neighbor
+        if (group < d->maxIslands-1) addNeighbor(d, group + 1, neighbors, n);    // right neighbor
         break;
 
     case topology3neighb:  // two rows. 3 neighbors
         // continue in next case
     case topologyQuadratic:  // quadratic organization
-        if (coloumn > 0) addNeighbor(d, deme - 1, neighbors, n);               // west neighbor
-        if (row > 0) addNeighbor(d, deme - d->rowLength, neighbors, n);        // north neighbor
+        if (coloumn > 0) addNeighbor(d, group - 1, neighbors, n);               // west neighbor
+        if (row > 0) addNeighbor(d, group - d->rowLength, neighbors, n);        // north neighbor
         if (row < lastRow) {
-            addNeighbor(d, deme + d->rowLength, neighbors, n);                 // south neighbor
-            if (coloumn < d->rowLength-1) addNeighbor(d, deme + 1, neighbors, n); // east neighbor
+            addNeighbor(d, group + d->rowLength, neighbors, n);                 // south neighbor
+            if (coloumn < d->rowLength-1) addNeighbor(d, group + 1, neighbors, n); // east neighbor
         }
         else {  // last row. no south neighbor
-            if (deme < d->maxIslands-1) addNeighbor(d, deme + 1, neighbors, n);// east neighbor        
+            if (group < d->maxIslands-1) addNeighbor(d, group + 1, neighbors, n);// east neighbor        
         }
         break;
 
     case topologyHoneycomb:  // honeycomb organization
-        if (coloumn > 0) addNeighbor(d, deme - 1, neighbors, n);               // west neighbor
+        if (coloumn > 0) addNeighbor(d, group - 1, neighbors, n);               // west neighbor
         if (row > 0) {
-            addNeighbor(d, deme - d->rowLength, neighbors, n);                 // north neighbor
+            addNeighbor(d, group - d->rowLength, neighbors, n);                 // north neighbor
             if (row & 1) {  // odd row
-                if (coloumn < d->rowLength-1) addNeighbor(d, deme - d->rowLength + 1, neighbors, n);  // north east neighbor
+                if (coloumn < d->rowLength-1) addNeighbor(d, group - d->rowLength + 1, neighbors, n);  // north east neighbor
             }
             else {  // even row
-                if (coloumn > 0) addNeighbor(d, deme - d->rowLength - 1, neighbors, n);  // north west neighbor
+                if (coloumn > 0) addNeighbor(d, group - d->rowLength - 1, neighbors, n);  // north west neighbor
             }
         }
         if (row < lastRow) {      // not last row
-            addNeighbor(d, deme + d->rowLength, neighbors, n);                 // south neighbor
+            addNeighbor(d, group + d->rowLength, neighbors, n);                 // south neighbor
             if (coloumn < d->rowLength - 1) {                                  // not last column
-                addNeighbor(d, deme + 1, neighbors, n);                        // east neighbor
+                addNeighbor(d, group + 1, neighbors, n);                        // east neighbor
             }
             if (row & 1) {  // odd row
                 if (coloumn < d->rowLength - 1) {
-                    addNeighbor(d, deme + d->rowLength + 1, neighbors, n);     // south east neighbor
+                    addNeighbor(d, group + d->rowLength + 1, neighbors, n);     // south east neighbor
                 }
             }
             else {  // even row
                 if (coloumn > 0) {
-                    addNeighbor(d, deme + d->rowLength - 1, neighbors, n);     // south west neighbor
+                    addNeighbor(d, group + d->rowLength - 1, neighbors, n);     // south west neighbor
                 }
             }
         }
         else {  // last row. no south neighbor
-            if (deme < d->maxIslands - 1) addNeighbor(d, deme + 1, neighbors, n); // east neighbor
+            if (group < d->maxIslands - 1) addNeighbor(d, group + 1, neighbors, n); // east neighbor
         }
         break;
 
     case topologyOctal:  // octal organization
-        if (coloumn > 0)  addNeighbor(d, deme - 1, neighbors, n);              // west neighbor
+        if (coloumn > 0)  addNeighbor(d, group - 1, neighbors, n);              // west neighbor
         if (row > 0) {
-            addNeighbor(d, deme - d->rowLength, neighbors, n);                 // north neighbor
-            if (coloumn < d->rowLength-1) addNeighbor(d, deme - d->rowLength + 1, neighbors, n); // north east neighbor
-            if (coloumn > 0) addNeighbor(d, deme - d->rowLength - 1, neighbors, n); // north west neighbor            
+            addNeighbor(d, group - d->rowLength, neighbors, n);                 // north neighbor
+            if (coloumn < d->rowLength-1) addNeighbor(d, group - d->rowLength + 1, neighbors, n); // north east neighbor
+            if (coloumn > 0) addNeighbor(d, group - d->rowLength - 1, neighbors, n); // north west neighbor            
         }
         if (row < lastRow) {      // not last row
-            addNeighbor(d, deme + d->rowLength, neighbors, n);                 // south neighbor
+            addNeighbor(d, group + d->rowLength, neighbors, n);                 // south neighbor
             if (coloumn < d->rowLength - 1) {                                  // not last column
-                addNeighbor(d, deme + 1, neighbors, n);                        // east neighbor
-                addNeighbor(d, deme + d->rowLength + 1, neighbors, n);         // south east neighbor
+                addNeighbor(d, group + 1, neighbors, n);                        // east neighbor
+                addNeighbor(d, group + d->rowLength + 1, neighbors, n);         // south east neighbor
             }
             if (coloumn > 0) {
-                addNeighbor(d, deme + d->rowLength - 1, neighbors, n);         // south west neighbor
+                addNeighbor(d, group + d->rowLength - 1, neighbors, n);         // south west neighbor
             }
         }
         else {  // last row. no south neighbor
-            if (deme < d->maxIslands - 1) addNeighbor(d, deme + 1, neighbors, n); // east neighbor
+            if (group < d->maxIslands - 1) addNeighbor(d, group + 1, neighbors, n); // east neighbor
         }
         break;
 
     case topologyRandom:                         // random migration. no organization
         j = d->ran->iRandom(0, d->maxIslands-2); // pick one of the neighbors
-        if (j >= deme) j++;                      // skip own island
+        if (j >= group) j++;                      // skip own island
         neighbors[n++] = j;
         break;
 

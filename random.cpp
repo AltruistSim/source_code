@@ -1,8 +1,8 @@
 /****************************  random.cpp   *****************************
 * Author:        Agner Fog
 * Date created:  2023-07-05
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-09-20
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines a pseudo random number generator and generation of

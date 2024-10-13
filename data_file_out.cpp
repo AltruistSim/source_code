@@ -1,8 +1,8 @@
 /**************************  data_file_out.cpp   ******************************
 * Author:        Agner Fog
 * Date created:  2023-08-31
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines functions for writing result data files
@@ -42,7 +42,7 @@ void Worker::fileOutStart() {
         snprintf(text, sizeof(text), "\n# Geography: maxNumGroups = %i, maxPerGroup = %i"
             "\n# carryingCapacity = %.1f, %.1f, carryingCapacityStandardDeviation = %.2f"
             "\n# minGroupSize = %i, recolonizationGroupSize = %i",
-            d->maxIslands, d->nMaxPerDeme, d->carryingCapacity[0], d->carryingCapacity[1],
+            d->maxIslands, d->nMaxPerGroup, d->carryingCapacity[0], d->carryingCapacity[1],
             d->carryingCapacityStandardDeviation, d->minGroupSize, d->colonySize);
         outputFile.write(text);
         // migration
@@ -75,8 +75,8 @@ void Worker::fileOutStart() {
         // group fitness
         snprintf(text, sizeof(text), "\n# Group properties: groupFitnessFunction = %i, groupFitnessExponent = %.2G"
             "\n# extinctionPattern = %i, warPattern = %i, survivalDegree = %.3G, warIntensity = %.3G"
-            "\n# demeExtinctionRates = %.3f, %.3f, %.3f, %.3f",
-            d->fitfunc, d->fitExpo, d->extinctionPattern, d->warPattern, d->surviv, d->warIntensity,
+            "\n# groupExtinctionRates = %.3f, %.3f, %.3f, %.3f",
+            d->fitfunc, d->groupFitCurvature, d->extinctionPattern, d->warPattern, d->surviv, d->warIntensity,
             d->extinctionRate[0], d->extinctionRate[1], d->extinctionRate[2], d->extinctionRate[3]);
         outputFile.write(text);
         snprintf(text, sizeof(text), "\n# Run control: randomSeed = %i"
@@ -136,7 +136,7 @@ void Worker::fileOutStart() {
     if (d->bOutOptions & 0x10) outputFile.write("altrusts, ");
     if (d->bOutOptions & 0x20) outputFile.write("mutations, ");
     if (d->bOutOptions & 0x40) outputFile.write("migrants, ");
-    if (d->bOutOptions & 0x100) outputFile.write("altruism_demes, ");
+    if (d->bOutOptions & 0x100) outputFile.write("altruism_groupss, ");
     if (d->bOutOptions & 0x200) outputFile.write("extinctions, ");
     if (d->bOutOptions & 0x400) outputFile.write("result, ");
     if (d->bOutOptions & 0x800) {  // model specific variable names
@@ -175,7 +175,7 @@ void Worker::fileOutGeneration() {
         outputFile.write(text);
     }
     if (d->bOutOptions & 4) {          // inhabited islands
-        snprintf(text, sizeof(text), "%i, ", d->inhabitedDemes);
+        snprintf(text, sizeof(text), "%i, ", d->inhabitedGroups);
         outputFile.write(text);
     }
     if (d->bOutOptions & 8) {          // gene fractions for all loci
@@ -199,12 +199,12 @@ void Worker::fileOutGeneration() {
         snprintf(text, sizeof(text), "%u, ", d->migrantsTot);
         outputFile.write(text);
     }
-    if (d->bOutOptions & 0x100) {      // altruism demes
-        snprintf(text, sizeof(text), "%u, ", d->altruistDemes);
+    if (d->bOutOptions & 0x100) {      // altruism groups
+        snprintf(text, sizeof(text), "%u, ", d->altruistGroups);
         outputFile.write(text);
     }
     if (d->bOutOptions & 0x200) {      // extinctions
-        snprintf(text, sizeof(text), "%u, ", d->demesDied);
+        snprintf(text, sizeof(text), "%u, ", d->groupsDied);
         outputFile.write(text);
     }
     if (d->bOutOptions & 0x400) {      // simulation result not available yet
@@ -254,7 +254,7 @@ void Worker::fileOutSimulationFinished() {
         outputFile.write(text);
     }
     if (d->bOutOptions & 4) {          // inhabited islands
-        snprintf(text, sizeof(text), "%i, ", d->inhabitedDemes);
+        snprintf(text, sizeof(text), "%i, ", d->inhabitedGroups);
         outputFile.write(text);
     }
     if (d->bOutOptions & 8) {          // gene fractions for all loci
@@ -278,8 +278,8 @@ void Worker::fileOutSimulationFinished() {
         snprintf(text, sizeof(text), "%G, ", double(d->sumMigrants));
         outputFile.write(text);
     }
-    if (d->bOutOptions & 0x100) {      // altruism demes
-        snprintf(text, sizeof(text), "%u, ", d->altruistDemes);
+    if (d->bOutOptions & 0x100) {      // altruism groups
+        snprintf(text, sizeof(text), "%u, ", d->altruistGroups);
         outputFile.write(text);
     }
     if (d->bOutOptions & 0x200) {      // extinctions
@@ -326,7 +326,7 @@ void Worker::fileOutSweepNext() {
         outputFile.write(text);
     }
     if (d->bOutOptions & 4) {          // inhabited islands
-        snprintf(text, sizeof(text), "%i, ", d->inhabitedDemes);
+        snprintf(text, sizeof(text), "%i, ", d->inhabitedGroups);
         outputFile.write(text);
     }
     if (d->bOutOptions & 8) {          // gene fractions for all loci
@@ -350,12 +350,12 @@ void Worker::fileOutSweepNext() {
         snprintf(text, sizeof(text), "%G, ", double(d->sumMigrants));
         outputFile.write(text);
     }
-    if (d->bOutOptions & 0x100) {      // altruism demes
-        snprintf(text, sizeof(text), "%u, ", d->altruistDemes);
+    if (d->bOutOptions & 0x100) {      // altruism groups
+        snprintf(text, sizeof(text), "%u, ", d->altruistGroups);
         outputFile.write(text);
     }
     if (d->bOutOptions & 0x200) {      // extinctions
-        snprintf(text, sizeof(text), "%u, ", d->demesDied);
+        snprintf(text, sizeof(text), "%u, ", d->groupsDied);
         outputFile.write(text);
     }
     if (d->bOutOptions & 0x400) {      // simulation result

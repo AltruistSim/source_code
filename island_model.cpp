@@ -1,8 +1,8 @@
 /****************************  island_model.cpp   *****************************
 * Author:        Agner Fog
 * Date created:  1994-09-25
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the island model with fixed geographic boundaries between groups
@@ -36,10 +36,10 @@ static const ParameterDef islandParameterDefinitions[] {
     {0, 0, 0, 0}
 };
 
-// Deme structure, describing each deme or territory
-struct IslandDeme {
-    int32_t nn;              // number of individuals in deme
-    int32_t nmax;            // carrying capacity or max deme size
+// group structure, describing each group or territory
+struct IslandGroup {
+    int32_t nn;              // number of individuals in group
+    int32_t nmax;            // carrying capacity or max group size
     int32_t gAltruism[2];    // gene pool, egoism, altruism
 #ifdef MORELOCI
     int32_t gEndogamy[2];    // gene pool, exogamy, endogamy
@@ -52,22 +52,22 @@ struct IslandDeme {
 };
 
 /*
-struct DemeFieldDescriptor {
+struct GroupFieldDescriptor {
     int32_t type;            // 0: end of list, 
-                             // 1: size of Deme structure, 
+                             // 1: size of group structure, 
                              // 2: carrying capacity (max individuals)
                              // 3: population (number of individuals)
                              // 4: gene count, 
                              // 5: genotype or phenotype count
                              // 8: group property
     int32_t varType;         // varInt16 or varInt32 or varFloat
-    int32_t offset;          // offset into Deme structure
+    int32_t offset;          // offset into group structure
     int32_t statistic;       // 1: calculate sum, 2: calculate mean
                              // 4: possible stop criterion, stop when above certain value
                              // 8: possible stop criterion, stop when below certain value
     int32_t graphics;        // show in graphics display:
                              // 2:  max size
-                             // 3:  population. divide by max size or nMaxPerDeme to get relative size
+                             // 3:  population. divide by max size or nMaxPerGroup to get relative size
                              // 4:  area. divide by territorySizeMax to get relative size
                              // 10: gene count for mutant, primary locus
                              // 11: gene count for mutant, secondary locus
@@ -77,23 +77,23 @@ struct DemeFieldDescriptor {
 };
 */
 
-// List of fields in Deme structure
-static const DemeFieldDescriptor islandDemeDescriptors[] = {
-    {1, varInt32, sizeof(IslandDeme), 0, 0, 0},
-    {3, varInt32, demeFieldOffset(IslandDeme,nn),             0, 3,  "population"},
-    {2, varInt32, demeFieldOffset(IslandDeme,nmax),           0, 2,  "carrying capacity"},
-    {4, varInt32, demeFieldOffset(IslandDeme,gAltruism[0]),   8, 0,  "egoism gene"},
-    {4, varInt32, demeFieldOffset(IslandDeme,gAltruism[1]),   5, 10, "altruism gene"},
+// List of fields in group structure
+static const GroupFieldDescriptor islandGroupDescriptors[] = {
+    {1, varInt32, sizeof(IslandGroup), 0, 0, 0},
+    {3, varInt32, groupFieldOffset(IslandGroup,nn),             0, 3,  "population"},
+    {2, varInt32, groupFieldOffset(IslandGroup,nmax),           0, 2,  "carrying capacity"},
+    {4, varInt32, groupFieldOffset(IslandGroup,gAltruism[0]),   8, 0,  "egoism gene"},
+    {4, varInt32, groupFieldOffset(IslandGroup,gAltruism[1]),   5, 10, "altruism gene"},
 #ifdef MORELOCI
-    {4, varInt32, demeFieldOffset(IslandDeme,gEndogamy[0]),   2, 0,  "exogamy gene"},
-    {4, varInt32, demeFieldOffset(IslandDeme,gEndogamy[1]),   2, 11, "endogamy gene"},
-    {4, varInt32, demeFieldOffset(IslandDeme,gConformity[0]), 2, 0,  "nonconformity gene"},
-    {4, varInt32, demeFieldOffset(IslandDeme,gConformity[1]), 2, 12, "conformity gene"},
+    {4, varInt32, groupFieldOffset(IslandGroup,gEndogamy[0]),   2, 0,  "exogamy gene"},
+    {4, varInt32, groupFieldOffset(IslandGroup,gEndogamy[1]),   2, 11, "endogamy gene"},
+    {4, varInt32, groupFieldOffset(IslandGroup,gConformity[0]), 2, 0,  "nonconformity gene"},
+    {4, varInt32, groupFieldOffset(IslandGroup,gConformity[1]), 2, 12, "conformity gene"},
 #endif
-    {8, varInt32, demeFieldOffset(IslandDeme,age),            0, 20, "age"},
-    {8, varInt32, demeFieldOffset(IslandDeme,altruists),      0, 20, "phenotypic altruists"},
-    {8, varInt32, demeFieldOffset(IslandDeme,emigrationPotential), 0, 20, "emigration potential"},    
-    {8, varFloat, demeFieldOffset(IslandDeme,groupfit),       2, 20, "group fitness"},
+    {8, varInt32, groupFieldOffset(IslandGroup,age),            0, 20, "age"},
+    {8, varInt32, groupFieldOffset(IslandGroup,altruists),      0, 20, "phenotypic altruists"},
+    {8, varInt32, groupFieldOffset(IslandGroup,emigrationPotential), 0, 20, "emigration potential"},    
+    {8, varFloat, groupFieldOffset(IslandGroup,groupfit),       2, 20, "group fitness"},
     {0, 0, 0, 0, 0, 0}       // mark end of list
 };
 
@@ -105,7 +105,7 @@ static const ModelDescriptor islandModel = {
     "Atruism will decrease individual fitness, but increase group fitness."
     "\nThis model can be extended with endogamy and conformity.",
     islandParameterDefinitions,
-    islandDemeDescriptors,
+    islandGroupDescriptors,
     &islandInitFunction,
     &islandGenerationFunction
 };
@@ -128,8 +128,8 @@ void islandInitFunction(AltruData * d, int state) {
         // model version
         d->modelVersionMajor = 3;
         d->modelVersionMinor = 0;
-        d->modelDemeStructureSize = sizeof(IslandDeme);
-        d->modelPopOffset = demeFieldOffset(IslandDeme,nn);// make nn available to findNeighbors function
+        d->modelGroupStructureSize = sizeof(IslandGroup);
+        d->modelPopOffset = groupFieldOffset(IslandGroup,nn);// make nn available to findNeighbors function
         // enable and disable fields in parameters dialog boxes
         d->bGeographyParametersUsed = 0x351312;
         d->bIndividualPropertiesUsed = 0xF;
@@ -181,21 +181,21 @@ void islandInitFunction(AltruData * d, int state) {
     }
 }
 
-static void errorCheck(AltruData * d, IslandDeme * deme) {
-    // check deme data for consistency
+static void errorCheck(AltruData * d, IslandGroup * group) {
+    // check group data for consistency
     char text[64];
-    if (deme->gAltruism[0] < 0 || deme->gAltruism[1] < 0
-        || deme->gAltruism[0] + deme->gAltruism[1] != deme->nn * 2
-        || (deme->gAltruism[0] + deme->gAltruism[1] & 1)) {
+    if (group->gAltruism[0] < 0 || group->gAltruism[1] < 0
+        || group->gAltruism[0] + group->gAltruism[1] != group->nn * 2
+        || (group->gAltruism[0] + group->gAltruism[1] & 1)) {
         sprintf_s(text, "error n %i, gAltru %i %i",
-            deme->nn, deme->gAltruism[0], deme->gAltruism[1]);
+            group->nn, group->gAltruism[0], group->gAltruism[1]);
         errors.reportError(text);
     }
 #ifdef MORELOCI
-    if ((d->locusUsed[locusEndogamy] && deme->gEndogamy[0] + deme->gEndogamy[1] != deme->nn * 2) ||
-        (d->locusUsed[locusConformity] && deme->gConformity[0] + deme->gConformity[1] != deme->nn * 2)) {
+    if ((d->locusUsed[locusEndogamy] && group->gEndogamy[0] + group->gEndogamy[1] != group->nn * 2) ||
+        (d->locusUsed[locusConformity] && group->gConformity[0] + group->gConformity[1] != group->nn * 2)) {
         sprintf_s(text, "error n %i, gEndo %i %i, gConf %i %i",
-            deme->nn, deme->gEndogamy[0], deme->gEndogamy[1], deme->gConformity[0], deme->gConformity[1]);
+            group->nn, group->gEndogamy[0], group->gEndogamy[1], group->gConformity[0], group->gConformity[1]);
         errors.reportError(text);
     }
 #endif
@@ -211,8 +211,8 @@ viability selection, population regulation, extinction, migration
 ******************************************************************************/
 
 void islandGenerationFunction(AltruData * d, int state) {
-    int32_t ideme;                                         // deme index
-    IslandDeme * deme;                                     // point to deme
+    int32_t iGroup;                                        // group index
+    IslandGroup * group;                                   // point to group
     int32_t genotypes1[3];                                 // egoists, heterozygote, altruists before selection
     int32_t genotypes2[3];                                 // egoists, heterozygote, altruists after selection
     double fitness[3];                                     // fitness of each genotype
@@ -221,11 +221,11 @@ void islandGenerationFunction(AltruData * d, int state) {
     int32_t neighbors[8];                                  // list of neighbor islands
     int numNeighbors;                                      // number of neighbor islands
     int32_t iNeighbor;                                     // index to neighbor islands
-    IslandDeme * neighborDeme = 0;                         // pointer to neighbor deme
+    IslandGroup * neighborGroup = 0;                       // pointer to neighbor group
     int inhabitedIslandsNum;                               // number of inhabited islands in inhabitedIslands list
 
     // check allocated memory
-    if (d->demeData == 0) return;
+    if (d->groupData == 0) return;
     if (d->extraBufferSize[0] < d->maxIslands * sizeof(int32_t)) {
         // allocate memory for list of inhabited islands
         if (d->extraBuffer[0]) delete[] d->extraBuffer[0]; // delete any previous smaller buffer
@@ -241,12 +241,12 @@ void islandGenerationFunction(AltruData * d, int state) {
         // initialize statistics variables
         statisticsInit0(d);
 
-        // initialize demes
+        // initialize groups
         d->nIslands = d->maxIslands;
 
-        for (ideme = 0; ideme < d->maxIslands; ideme++) {
-            deme = (IslandDeme*)(d->demeData) + ideme;     // point to current deme
-            //deme->nmax = d->nMaxPerDeme;                 // max population
+        for (iGroup = 0; iGroup < d->maxIslands; iGroup++) {
+            group = (IslandGroup*)(d->groupData) + iGroup;     // point to current group
+            //group->nmax = d->nMaxPerGroup;                 // max population
             // randomize island size
             int32_t nmax;
             if (d->carryingCapacityStandardDeviation > 0.) {
@@ -260,40 +260,40 @@ void islandGenerationFunction(AltruData * d, int state) {
                 // constant carrying capacity
                 nmax = (int)lround(d->carryingCapacity[0]);
             }
-            deme->nmax = nmax;
-            d->nMaxPerDeme = nmax;
+            group->nmax = nmax;
+            d->nMaxPerGroup = nmax;
 
-            deme->nn = d->ran->poisson(deme->nmax / 2u);        // random population size
-            if (deme->nn > deme->nmax) deme->nn = deme->nmax;   // limit population
-            if (deme->nn < d->minGroupSize) deme->nn = 0;       // extinction if below minimum
-            deme->gAltruism[1] = d->ran->binomial(deme->nn * 2, d->fg0[locusAltruism]); // number of altruism genes
-            deme->gAltruism[0] = deme->nn * 2 - deme->gAltruism[1];                     // number of egoism genes 
+            group->nn = d->ran->poisson(group->nmax / 2u);        // random population size
+            if (group->nn > group->nmax) group->nn = group->nmax;   // limit population
+            if (group->nn < d->minGroupSize) group->nn = 0;       // extinction if below minimum
+            group->gAltruism[1] = d->ran->binomial(group->nn * 2, d->fg0[locusAltruism]); // number of altruism genes
+            group->gAltruism[0] = group->nn * 2 - group->gAltruism[1];                     // number of egoism genes 
 #ifdef MORELOCI
             if (d->locusUsed[locusEndogamy]) {
-                deme->gEndogamy[1] = d->ran->binomial(deme->nn * 2, d->fg0[locusEndogamy]); // number of endogamy genes
-                deme->gEndogamy[0] = deme->nn * 2 - deme->gEndogamy[1];                     // number of exogamy genes 
+                group->gEndogamy[1] = d->ran->binomial(group->nn * 2, d->fg0[locusEndogamy]); // number of endogamy genes
+                group->gEndogamy[0] = group->nn * 2 - group->gEndogamy[1];                     // number of exogamy genes 
             }
             if (d->locusUsed[locusConformity]) {
-                deme->gConformity[1] = d->ran->binomial(deme->nn * 2, d->fg0[locusConformity]); // number of conformity genes
-                deme->gConformity[0] = deme->nn * 2 - deme->gConformity[1];                     // number of nonconformity genes 
+                group->gConformity[1] = d->ran->binomial(group->nn * 2, d->fg0[locusConformity]); // number of conformity genes
+                group->gConformity[0] = group->nn * 2 - group->gConformity[1];                     // number of nonconformity genes 
             }
 #endif
-            deme->age = 1;                                 // don't set age = 0, that means extinction
-            deme->emigrationPotential = 1; // not calculated yet
-            deme->groupfit = 0.f;      // not calculated yet
-            errorCheck(d, deme);
+            group->age = 1;                                 // don't set age = 0, that means extinction
+            group->emigrationPotential = 1; // not calculated yet
+            group->groupfit = 0.f;      // not calculated yet
+            errorCheck(d, group);
         }
         // reset migrant pool
-        deme = (IslandDeme*)(d->demeData) + d->maxIslands;
-        deme->nmax = deme->nn = 0;
-        deme->gAltruism[0] = deme->gAltruism[1] = 0;
+        group = (IslandGroup*)(d->groupData) + d->maxIslands;
+        group->nmax = group->nn = 0;
+        group->gAltruism[0] = group->gAltruism[1] = 0;
 #ifdef MORELOCI
-        deme->gConformity[0] = deme->gConformity[1] = 0;
-        deme->gEndogamy[0]   = deme->gEndogamy[1]   = 0;
+        group->gConformity[0] = group->gConformity[1] = 0;
+        group->gEndogamy[0]   = group->gEndogamy[1]   = 0;
 #endif
-        deme->age = 1; 
-        deme->groupfit = 0.f;
-        deme->emigrationPotential = 0;
+        group->age = 1; 
+        group->groupfit = 0.f;
+        group->emigrationPotential = 0;
 
         // start running
         d->runState = state_run;
@@ -307,98 +307,98 @@ void islandGenerationFunction(AltruData * d, int state) {
 
         inhabitedIslandsNum = 0;
 
-        // deme loop 1: mutation, growth, selection, group selection
-        for (ideme = 0; ideme < d->maxIslands; ideme++) {
-            deme = (IslandDeme*)(d->demeData) + ideme;     // point to current deme
+        // group loop 1: mutation, growth, selection, group selection
+        for (iGroup = 0; iGroup < d->maxIslands; iGroup++) {
+            group = (IslandGroup*)(d->groupData) + iGroup;     // point to current group
 
-            errorCheck(d, deme);
+            errorCheck(d, group);
 
             // mutation
-            int32_t forwardMutations = d->ran->binomial(deme->gAltruism[0], d->murate[locusAltruism][0]);
-            int32_t backwardMutations = d->ran->binomial(deme->gAltruism[1], d->murate[locusAltruism][1]);
-            deme->gAltruism[1] += forwardMutations - backwardMutations;
-            deme->gAltruism[0] -= forwardMutations - backwardMutations;
+            int32_t forwardMutations = d->ran->binomial(group->gAltruism[0], d->murate[locusAltruism][0]);
+            int32_t backwardMutations = d->ran->binomial(group->gAltruism[1], d->murate[locusAltruism][1]);
+            group->gAltruism[1] += forwardMutations - backwardMutations;
+            group->gAltruism[0] -= forwardMutations - backwardMutations;
             d->mutations[locusAltruism][0] += forwardMutations;
             d->mutations[locusAltruism][1] += backwardMutations;
 #ifdef MORELOCI
             if (d->locusUsed[locusEndogamy]) {  // endogamy locus
-                forwardMutations = d->ran->binomial(deme->gEndogamy[0], d->murate[locusEndogamy][0]);
-                backwardMutations = d->ran->binomial(deme->gEndogamy[1], d->murate[locusEndogamy][1]);
-                deme->gEndogamy[1] += forwardMutations - backwardMutations;
-                deme->gEndogamy[0] -= forwardMutations - backwardMutations;
+                forwardMutations = d->ran->binomial(group->gEndogamy[0], d->murate[locusEndogamy][0]);
+                backwardMutations = d->ran->binomial(group->gEndogamy[1], d->murate[locusEndogamy][1]);
+                group->gEndogamy[1] += forwardMutations - backwardMutations;
+                group->gEndogamy[0] -= forwardMutations - backwardMutations;
                 d->mutations[locusEndogamy][0] += forwardMutations;
                 d->mutations[locusEndogamy][1] += backwardMutations;
             }
             if (d->locusUsed[locusConformity]) {  // conformity locus
-                forwardMutations = d->ran->binomial(deme->gConformity[0], d->murate[locusConformity][0]);
-                backwardMutations = d->ran->binomial(deme->gConformity[1], d->murate[locusConformity][1]);
-                deme->gConformity[1] += forwardMutations - backwardMutations;
-                deme->gConformity[0] -= forwardMutations - backwardMutations;
+                forwardMutations = d->ran->binomial(group->gConformity[0], d->murate[locusConformity][0]);
+                backwardMutations = d->ran->binomial(group->gConformity[1], d->murate[locusConformity][1]);
+                group->gConformity[1] += forwardMutations - backwardMutations;
+                group->gConformity[0] -= forwardMutations - backwardMutations;
                 d->mutations[locusConformity][0] += forwardMutations;
                 d->mutations[locusConformity][1] += backwardMutations;
             }
 #endif
 
             // calculate fraction of altruists
-            combineGenes(deme->gAltruism, genotypes1, d->ran);
-            deme->altruists = genotypes1[2];     // number of phenotypic altruists
+            combineGenes(group->gAltruism, genotypes1, d->ran);
+            group->altruists = genotypes1[2];     // number of phenotypic altruists
             switch (d->dominance[locusAltruism]) {
             case recessive:            // altruism recessive
                 break;
             case dominant:             // altruism dominant
-                deme->altruists += genotypes1[1];
+                group->altruists += genotypes1[1];
                 break;
             case incompleteDominant:    // half dominant
-                deme->altruists += genotypes1[1] / 2;
+                group->altruists += genotypes1[1] / 2;
             }
             float fractionOfAltruists = 0.f;
-            if (deme->nn) {            // avoid division by 0          
-                fractionOfAltruists = float(deme->altruists) / float(deme->nn);
+            if (group->nn) {            // avoid division by 0          
+                fractionOfAltruists = float(group->altruists) / float(group->nn);
             }
 
             // calculate group fitness from fraction of altruists and group fitness exponent
             switch (d->fitfunc) {
             case 0:                    // one altruist is enough
-                if (deme->altruists > 0) deme->groupfit = 1.f;
-                else deme->groupfit = 0.f;
+                if (group->altruists > 0) group->groupfit = 1.f;
+                else group->groupfit = 0.f;
                 break;
             case 1: case 3:            // convex/concave
-                deme->groupfit = powf(fractionOfAltruists, d->fitExpo);
+                group->groupfit = powf(fractionOfAltruists, d->groupFitCurvature);
                 break;
             case 2:  default:          // linear
-                deme->groupfit = fractionOfAltruists;
+                group->groupfit = fractionOfAltruists;
                 break;
             case 4:                    // all or nothing
-                if (deme->altruists == deme->nn) deme->groupfit = 1.f;
-                else deme->groupfit = 0.f;
+                if (group->altruists == group->nn) group->groupfit = 1.f;
+                else group->groupfit = 0.f;
                 break;
             }
 
             // reproduction and growth
             if (d->selectionModel != selectionFecundity) {  // same growth rate for all except under fecundity selection
-                int32_t nn2 = d->ran->poisson(double(deme->nn) * d->growthRate);    // new population size
-                int32_t me = d->ran->binomial(nn2 * 2, deme->gAltruism[0] / (deme->nn * 2.));
+                int32_t nn2 = d->ran->poisson(double(group->nn) * d->growthRate);    // new population size
+                int32_t me = d->ran->binomial(nn2 * 2, group->gAltruism[0] / (group->nn * 2.));
                 int32_t ma = nn2 * 2 - me;
-                deme->gAltruism[0] = me;
-                deme->gAltruism[1] = ma;
+                group->gAltruism[0] = me;
+                group->gAltruism[1] = ma;
 
                 // split into genotypes
-                combineGenes(deme->gAltruism, genotypes1, d->ran);
+                combineGenes(group->gAltruism, genotypes1, d->ran);
 #ifdef MORELOCI
-                int32_t nGenes = deme->gAltruism[0] + deme->gAltruism[1];  // total number of genes
+                int32_t nGenes = group->gAltruism[0] + group->gAltruism[1];  // total number of genes
                 if (d->locusUsed[locusEndogamy]) {
-                    deme->gEndogamy[0] = d->ran->binomial(nGenes, double(deme->gEndogamy[0]) / double(deme->gEndogamy[0] + deme->gEndogamy[1]));
-                    deme->gEndogamy[1] = nGenes - deme->gEndogamy[0];
+                    group->gEndogamy[0] = d->ran->binomial(nGenes, double(group->gEndogamy[0]) / double(group->gEndogamy[0] + group->gEndogamy[1]));
+                    group->gEndogamy[1] = nGenes - group->gEndogamy[0];
                 }
                 if (d->locusUsed[locusConformity]) {
-                    deme->gConformity[0] = d->ran->binomial(nGenes, double(deme->gConformity[0]) / double(deme->gConformity[0] + deme->gConformity[1]));
-                    deme->gConformity[1] = nGenes - deme->gConformity[0];
+                    group->gConformity[0] = d->ran->binomial(nGenes, double(group->gConformity[0]) / double(group->gConformity[0] + group->gConformity[1]));
+                    group->gConformity[1] = nGenes - group->gConformity[0];
                 }
 #endif
             }
-            deme->nn = (deme->gAltruism[0] + deme->gAltruism[1]) / 2u;
-            deme->emigrationPotential = deme->nn - deme->nmax;               // excess population can emigrate
-            if (deme->emigrationPotential < 0) deme->emigrationPotential = 0;
+            group->nn = (group->gAltruism[0] + group->gAltruism[1]) / 2u;
+            group->emigrationPotential = group->nn - group->nmax;               // excess population can emigrate
+            if (group->emigrationPotential < 0) group->emigrationPotential = 0;
 
             // find fitness of egoists and altruists
             float fit[4]; // fitness of egoists among egoists, egoists among altruists, altruists among egoists, altruists among altruists
@@ -408,7 +408,7 @@ void islandGenerationFunction(AltruData * d, int state) {
                 // calculate level of conformity
                 int32_t conformityGenotypes[3];
                 // split gene pool into genotypes
-                combineGenes(deme->gConformity, conformityGenotypes, d->ran);
+                combineGenes(group->gConformity, conformityGenotypes, d->ran);
                 // find number of phenotypic conformists
                 int32_t conformists = conformityGenotypes[2];
                 switch (d->dominance[locusConformity]) {
@@ -421,8 +421,8 @@ void islandGenerationFunction(AltruData * d, int state) {
                     conformists += conformityGenotypes[1] / 2;
                 }
                 float conformity = 0.f;  // fraction of conformists
-                if (deme->nn > 0) {
-                    conformity = float(conformists) / float(deme->nn);
+                if (group->nn > 0) {
+                    conformity = float(conformists) / float(group->nn);
                 }
                 // adjust fitness coefficients to level of conformity
                 for (int i = 0; i < 4; i++) {
@@ -431,8 +431,8 @@ void islandGenerationFunction(AltruData * d, int state) {
             }
 #endif
             // calculate relative fitness for egoists and altruists
-            fitness[0] = fit[0] * (1.f - deme->groupfit) + fit[1] * deme->groupfit; // fitness of egoists
-            fitness[2] = fit[2] * (1.f - deme->groupfit) + fit[3] * deme->groupfit; // fitness of altruists
+            fitness[0] = fit[0] * (1.f - group->groupfit) + fit[1] * group->groupfit; // fitness of egoists
+            fitness[2] = fit[2] * (1.f - group->groupfit) + fit[3] * group->groupfit; // fitness of altruists
             switch (d->dominance[locusAltruism]) {  // find fitness of heterozygotes
             case recessive: // altruism recessive
                 fitness[1] = fitness[0];  break;
@@ -442,18 +442,18 @@ void islandGenerationFunction(AltruData * d, int state) {
                 fitness[1] = 0.5 * (fitness[0] + fitness[2]);  break;
             }
 
-            int32_t populationSize = deme->nn;
-            if (populationSize > deme->nmax) populationSize = deme->nmax;
+            int32_t populationSize = group->nn;
+            if (populationSize > group->nmax) populationSize = group->nmax;
             
             // selection according to selection model
             switch (d->selectionModel) {
 
             case selectionFecundity: default:   // fecundity selection
-                differentialGrowth(deme->gAltruism, fitness, genotypes2, d->ran);
+                differentialGrowth(group->gAltruism, fitness, genotypes2, d->ran);
                 populationSize = genotypes2[0] + genotypes2[1] + genotypes2[2];
-                deme->emigrationPotential = populationSize - deme->nmax;
-                if (deme->emigrationPotential < 0) deme->emigrationPotential = 0;
-                if (populationSize > deme->nmax) populationSize = deme->nmax;
+                group->emigrationPotential = populationSize - group->nmax;
+                if (group->emigrationPotential < 0) group->emigrationPotential = 0;
+                if (populationSize > group->nmax) populationSize = group->nmax;
                 // don't reduce the population size until after migration
                 //d->ran->multiHypergeometric(genotypes2, genotypes1, populationSize, 3);
                 break;
@@ -508,25 +508,25 @@ void islandGenerationFunction(AltruData * d, int state) {
             int32_t g1 = genotypes2[1]*2 - g0;
 
             // genes after selection
-            deme->gAltruism[0] = genotypes2[0] * 2 + g0;
-            deme->gAltruism[1] = genotypes2[2] * 2 + g1;
-            deme->nn = (deme->gAltruism[0]+deme->gAltruism[1]) / 2u; // number of individuals
+            group->gAltruism[0] = genotypes2[0] * 2 + g0;
+            group->gAltruism[1] = genotypes2[2] * 2 + g1;
+            group->nn = (group->gAltruism[0]+group->gAltruism[1]) / 2u; // number of individuals
 #ifdef MORELOCI
             if (d->locusUsed[locusEndogamy]) {   // growth, selection, and drift at endogamy locus         
-                growthAndSelection(deme->gEndogamy, deme->nn, d->dominance[locusEndogamy], d->fit2[0], d->ran);
+                growthAndSelection(group->gEndogamy, group->nn, d->dominance[locusEndogamy], d->fit2[0], d->ran);
             }
             if (d->locusUsed[locusConformity]) { // growth, selection, and drift at conformity locus         
-                growthAndSelection(deme->gConformity, deme->nn, d->dominance[locusConformity], d->fit2[2], d->ran);
+                growthAndSelection(group->gConformity, group->nn, d->dominance[locusConformity], d->fit2[2], d->ran);
             }
 #endif
 
             // emigration
             switch (d->emigrationPattern) {
             case emigrationConstant:                           // emigration independent of population
-                deme->emigrationPotential = d->nMaxPerDeme / 2u;
+                group->emigrationPotential = d->nMaxPerGroup / 2u;
                 break;
             case emigrationProportional:                       // emigration proportional to population
-                deme->emigrationPotential = deme->nn;
+                group->emigrationPotential = group->nn;
                 break;
             case emigrationExcess:                             // emigration proportional to excess population
                 // emigrationPotential has been calculated above
@@ -535,35 +535,35 @@ void islandGenerationFunction(AltruData * d, int state) {
                 for (int i = 0; i < 3; i++) {
                     populationExcess += (int32_t)lround(genotypes1[i] * fitness[i]);
                 }
-                populationExcess -= deme->nmax;
+                populationExcess -= group->nmax;
                 if (populationExcess < 0) populationExcess = 0;
-                deme->emigrationPotential = populationExcess;*/
+                group->emigrationPotential = populationExcess;*/
                 break;
             case emigrationGroupfit:
-                deme->emigrationPotential = (int32_t)lround(deme->nn * deme->groupfit);
+                group->emigrationPotential = (int32_t)lround(group->nn * group->groupfit);
                 break;
             }
 
-            // find neighbor demes if needed
+            // find neighbor groups if needed
             numNeighbors = 0;
             iNeighbor = 0;
             float fitness2 = 1.f;      // fitness relative to neighbor
 
             if (d->extinctionPattern == extinctionNeighbor || d->extinctionPattern == extinctionStrongest) {
                 // make list of neighbors
-                numNeighbors = findNeighbors(d, ideme, neighbors);
+                numNeighbors = findNeighbors(d, iGroup, neighbors);
             }
 
             switch (d->extinctionPattern) {
             case extinctionOwn:        // extinction probability depends on own group fitness only
-                fitness2 = deme->groupfit;
+                fitness2 = group->groupfit;
                 break;
 
             case extinctionNeighbor:   // extinction probability depends on fitness relative to random neighbor
                 if (numNeighbors) {
-                    iNeighbor = d->ran->iRandom(0, numNeighbors-1);   // find random neighbor deme
-                    neighborDeme = (IslandDeme*)(d->demeData) + neighbors[iNeighbor];  // point to neighbor deme
-                    fitness2 = (1.f + deme->groupfit - neighborDeme->groupfit) * 0.5;
+                    iNeighbor = d->ran->iRandom(0, numNeighbors-1);   // find random neighbor group
+                    neighborGroup = (IslandGroup*)(d->groupData) + neighbors[iNeighbor];  // point to neighbor group
+                    fitness2 = (1.f + group->groupfit - neighborGroup->groupfit) * 0.5;
                 }
                 break;
 
@@ -571,22 +571,22 @@ void islandGenerationFunction(AltruData * d, int state) {
                 if (numNeighbors) {
                     // find strongest neighbor
                     float strongest = 0.f;  // fitness*population of strongest neighbor
-                    IslandDeme * strongestNeighbor = 0;
+                    IslandGroup * strongestNeighbor = 0;
                     for (int j = 0; j < numNeighbors; j++) {
-                        neighborDeme = (IslandDeme*)(d->demeData) + neighbors[j];  // point to neighbor deme
-                        if (neighborDeme->groupfit * neighborDeme->nn > strongest) {
-                            strongest = neighborDeme->groupfit * neighborDeme->nn;
-                            strongestNeighbor = neighborDeme;
+                        neighborGroup = (IslandGroup*)(d->groupData) + neighbors[j];  // point to neighbor group
+                        if (neighborGroup->groupfit * neighborGroup->nn > strongest) {
+                            strongest = neighborGroup->groupfit * neighborGroup->nn;
+                            strongestNeighbor = neighborGroup;
                         }
                     }
                     if (strongestNeighbor) {
-                        fitness2 = (1.f + deme->groupfit - strongestNeighbor->groupfit) * 0.5;
+                        fitness2 = (1.f + group->groupfit - strongestNeighbor->groupfit) * 0.5;
                     }
                 }
             }
             
             // extinction
-            float relativeSize = float(deme->nn) / float(deme->nmax); // relative size of deme
+            float relativeSize = float(group->nn) / float(group->nmax); // relative size of group
             if (relativeSize > 1.f) relativeSize = 1.0f;
 
             float extinctionRate = 
@@ -596,59 +596,59 @@ void islandGenerationFunction(AltruData * d, int state) {
             // kill with probability extinctionRate
             bool kill = d->ran->bernoulli(extinctionRate);
 
-            if (kill) {                // this deme goes extinct
-                deme->age = 0;         // age = 0 means extinct
-                d->demesDied++;
+            if (kill) {                // this group goes extinct
+                group->age = 0;         // age = 0 means extinct
+                d->groupsDied++;
                 if (d->surviv > 0.f) { // a fraction survives
-                    int32_t numSurvivors = d->ran->binomial(deme->nn, d->surviv);
-                    deme->gAltruism[0] = d->ran->hypergeometric(numSurvivors * 2, deme->gAltruism[0], deme->nn * 2);
-                    deme->gAltruism[1] = numSurvivors * 2 - deme->gAltruism[0];
-                    deme->nn = numSurvivors;
-                    deme->groupfit = 0.f;
+                    int32_t numSurvivors = d->ran->binomial(group->nn, d->surviv);
+                    group->gAltruism[0] = d->ran->hypergeometric(numSurvivors * 2, group->gAltruism[0], group->nn * 2);
+                    group->gAltruism[1] = numSurvivors * 2 - group->gAltruism[0];
+                    group->nn = numSurvivors;
+                    group->groupfit = 0.f;
 #ifdef MORELOCI
                     if (d->locusUsed[locusEndogamy]) {
-                        deme->gEndogamy[0] = d->ran->hypergeometric(numSurvivors * 2, deme->gEndogamy[0], deme->nn * 2);
-                        deme->gEndogamy[1] = numSurvivors * 2 - deme->gEndogamy[0];
+                        group->gEndogamy[0] = d->ran->hypergeometric(numSurvivors * 2, group->gEndogamy[0], group->nn * 2);
+                        group->gEndogamy[1] = numSurvivors * 2 - group->gEndogamy[0];
                     }
                     if (d->locusUsed[locusConformity]) {
-                        deme->gConformity[0] = d->ran->hypergeometric(numSurvivors * 2, deme->gConformity[0], deme->nn * 2);
-                        deme->gConformity[1] = numSurvivors * 2 - deme->gConformity[0];
+                        group->gConformity[0] = d->ran->hypergeometric(numSurvivors * 2, group->gConformity[0], group->nn * 2);
+                        group->gConformity[1] = numSurvivors * 2 - group->gConformity[0];
                     }
 #endif
                 }
                 else {   // all die
-                    deme->gAltruism[0] = deme->gAltruism[1] = 0;
+                    group->gAltruism[0] = group->gAltruism[1] = 0;
 #ifdef MORELOCI
-                    deme->gConformity[0] = deme->gConformity[1] = 0;
-                    deme->gEndogamy[0] = deme->gEndogamy[1] = 0;
+                    group->gConformity[0] = group->gConformity[1] = 0;
+                    group->gEndogamy[0] = group->gEndogamy[1] = 0;
 #endif
-                    deme->nn = 0;
-                    deme->groupfit = 0.f;
+                    group->nn = 0;
+                    group->groupfit = 0.f;
                 }
             }
 
             // make list of inhabited islands 
-            if (deme->nn > 0 && inhabitedIslandsNum < d->maxIslands) {
-                inhabitedIslands[inhabitedIslandsNum++] = ideme;
+            if (group->nn > 0 && inhabitedIslandsNum < d->maxIslands) {
+                inhabitedIslands[inhabitedIslandsNum++] = iGroup;
             }
         }
 
-        // deme loop 2: migration, recolonization
-        for (ideme = 0; ideme < d->maxIslands; ideme++) {
-            deme = (IslandDeme*)(d->demeData) + ideme;     // point to current deme
+        // group loop 2: migration, recolonization
+        for (iGroup = 0; iGroup < d->maxIslands; iGroup++) {
+            group = (IslandGroup*)(d->groupData) + iGroup;     // point to current group
 
-            errorCheck(d, deme);
+            errorCheck(d, group);
 
             // make list of neighbors
-            numNeighbors = findNeighbors(d, ideme, neighbors); // find neighbor demes
-            neighborDeme = 0;
-            IslandDeme neighborPool;         // all neighbors pooled
+            numNeighbors = findNeighbors(d, iGroup, neighbors); // find neighbor groups
+            neighborGroup = 0;
+            IslandGroup neighborPool;         // all neighbors pooled
 
             if (numNeighbors) {
                 // immigration and colonization use similar patterns
                 int migrationOrColonizationPattern;
-                if (deme->age == 0 || deme->nn == 0) {  // group is extinct or empty. recolonize
-                    deme->age = 0;                      // reset age if group is empty but not extinct
+                if (group->age == 0 || group->nn == 0) {  // group is extinct or empty. recolonize
+                    group->age = 0;                      // reset age if group is empty but not extinct
                     migrationOrColonizationPattern = d->colonizationPattern;
                 }
                 else {   // group is not extinct. calculate immigration
@@ -660,14 +660,14 @@ void islandGenerationFunction(AltruData * d, int state) {
                 switch (migrationOrColonizationPattern) {
                 case immigrationCommonPool:
                     // migrants come from common pool
-                    neighborDeme = (IslandDeme*)(d->demeData) + d->maxIslands; // point to common pool
+                    neighborGroup = (IslandGroup*)(d->groupData) + d->maxIslands; // point to common pool
                     break;
                 case immigrationNeighbor:
                 case immigrationProportional:
                 case immigrationVacant:
                     // migrants come from random neighbor
-                    iNeighbor = d->ran->iRandom(0, numNeighbors - 1);   // find random neighbor deme
-                    neighborDeme = (IslandDeme*)(d->demeData) + neighbors[iNeighbor];  // point to neighbor deme
+                    iNeighbor = d->ran->iRandom(0, numNeighbors - 1);   // find random neighbor group
+                    neighborGroup = (IslandGroup*)(d->groupData) + neighbors[iNeighbor];  // point to neighbor group
                     break;
                 case immigrationAllNeighbors: {// sum of all neighbors
                     // make weighted sum of all neighbor gene pools
@@ -675,15 +675,15 @@ void islandGenerationFunction(AltruData * d, int state) {
                     double sumGene[6] = {0,0,0,0,0,0};               // sum of neighbor genes * emigrationPotential
                     double sumEmigr = 0;                             // sum of emigrationPotential
                     for (int i = 0; i < numNeighbors; i++) {
-                        neighborDeme = (IslandDeme*)(d->demeData) + neighbors[i];  // point to neighbor deme
-                        sumGene[0] += double(neighborDeme->gAltruism[0]) * neighborDeme->emigrationPotential;
-                        sumGene[1] += double(neighborDeme->gAltruism[1]) * neighborDeme->emigrationPotential;
-                        sumEmigr += neighborDeme->emigrationPotential;
+                        neighborGroup = (IslandGroup*)(d->groupData) + neighbors[i];  // point to neighbor group
+                        sumGene[0] += double(neighborGroup->gAltruism[0]) * neighborGroup->emigrationPotential;
+                        sumGene[1] += double(neighborGroup->gAltruism[1]) * neighborGroup->emigrationPotential;
+                        sumEmigr += neighborGroup->emigrationPotential;
 #ifdef MORELOCI
-                        sumGene[2] += neighborDeme->gEndogamy[0] * neighborDeme->emigrationPotential;
-                        //sumGene[3] += neighborDeme->gEndogamy[1] * neighborDeme->emigrationPotential;#endif
-                        sumGene[4] += neighborDeme->gConformity[0] * neighborDeme->emigrationPotential;
-                        //sumGene[5] += neighborDeme->gConformity[1] * neighborDeme->emigrationPotential;
+                        sumGene[2] += neighborGroup->gEndogamy[0] * neighborGroup->emigrationPotential;
+                        //sumGene[3] += neighborGroup->gEndogamy[1] * neighborGroup->emigrationPotential;#endif
+                        sumGene[4] += neighborGroup->gConformity[0] * neighborGroup->emigrationPotential;
+                        //sumGene[5] += neighborGroup->gConformity[1] * neighborGroup->emigrationPotential;
 #endif
                     }
                     neighborPool.gAltruism[0] = lround(sumGene[0] / sumEmigr);
@@ -705,30 +705,30 @@ void islandGenerationFunction(AltruData * d, int state) {
                     if (neighborPool.gConformity[0] > numg) neighborPool.gConformity[0] = numg;
                     neighborPool.gConformity[1] = numg - neighborPool.gConformity[0];
 #endif
-                    neighborDeme = &neighborPool;
+                    neighborGroup = &neighborPool;
                     break; }
                 case immigrationRandomGroup:
                     if (inhabitedIslandsNum > 0) {  // immigration from random inhabited island
                         int i = d->ran->iRandom(0, inhabitedIslandsNum - 1);         // find random inhabited island
                         iNeighbor = inhabitedIslands[i];
-                        neighborDeme = (IslandDeme*)(d->demeData) + iNeighbor;     // point to random deme
+                        neighborGroup = (IslandGroup*)(d->groupData) + iNeighbor;     // point to random group
                     }
                     break;
                 case immigrationStrongNeighbor: {
                     // choose among all neighbors with probability proportional to emigrationPotential
                     int32_t sumEmig = 0;  // sum of emigration potential of all neighbors
                     for (int i = 0; i < numNeighbors; i++) {
-                        neighborDeme = (IslandDeme*)(d->demeData) + neighbors[i];  // point to neighbor deme
-                        sumEmig += neighborDeme->emigrationPotential;
+                        neighborGroup = (IslandGroup*)(d->groupData) + neighbors[i];  // point to neighbor group
+                        sumEmig += neighborGroup->emigrationPotential;
                     }
                     if (sumEmig == 0) {
-                        neighborDeme = 0; break;
+                        neighborGroup = 0; break;
                     }
                     int32_t choose = d->ran->iRandom(0, sumEmig - 1);              // random number for choosing neighbor
                     sumEmig = 0;
                     for (int i = 0; i < numNeighbors; i++) {
-                        neighborDeme = (IslandDeme*)(d->demeData) + neighbors[i];  // point to neighbor deme
-                        sumEmig += neighborDeme->emigrationPotential;
+                        neighborGroup = (IslandGroup*)(d->groupData) + neighbors[i];  // point to neighbor group
+                        sumEmig += neighborGroup->emigrationPotential;
                         if (sumEmig >= choose) {
                             iNeighbor = i;
                             break;
@@ -739,7 +739,7 @@ void islandGenerationFunction(AltruData * d, int state) {
                 // determine number of immigrants or colonists
                 int32_t numMigrants = 0;         // number of immigrants or colonists
 
-                if (deme->age == 0) {  // group is extinct. recolonize
+                if (group->age == 0) {  // group is extinct. recolonize
                     numMigrants = d->ran->poisson(d->colonySize);
                 }
                 else {  // group is not extinct. calculate number of immigrants
@@ -750,7 +750,7 @@ void islandGenerationFunction(AltruData * d, int state) {
                         // find number of phenotypic endogamists
                         int32_t endogamyGenotypes[3];
                         // split gene pool into genotypes
-                        combineGenes(deme->gEndogamy, endogamyGenotypes, d->ran);
+                        combineGenes(group->gEndogamy, endogamyGenotypes, d->ran);
                         // find number of phenotypic endogamists
                         int32_t endogamists = endogamyGenotypes[2];
                         switch (d->dominance[locusEndogamy]) {
@@ -763,8 +763,8 @@ void islandGenerationFunction(AltruData * d, int state) {
                             endogamists += endogamyGenotypes[1] / 2;
                         }
                         float endogamy = 0.f;        // fraction of endogamists
-                        if (deme->nn > 0) {
-                            endogamy = float(endogamists) / float(deme->nn);
+                        if (group->nn > 0) {
+                            endogamy = float(endogamists) / float(group->nn);
                         }
                         // migrationRate as a function of endogamy
                         migrationRate = endogamy * d->migrationRate[1] + (1.f - endogamy) * d->migrationRate[0];
@@ -773,21 +773,25 @@ void islandGenerationFunction(AltruData * d, int state) {
                     // find number of immigrants according to immigrationPattern
                     switch (d->immigrationPattern) {
                     case immigrationCommonPool:      // from common pool
-                        numMigrants = d->ran->poisson(migrationRate * deme->nmax);
+                        numMigrants = d->ran->poisson(migrationRate * group->nmax);
                         break;
-                    case immigrationNeighbor:        // from random neighbor deme
-                    case immigrationRandomGroup:     // from random deme
+                    case immigrationNeighbor:        // from random neighbor group
+                    case immigrationRandomGroup:     // from random group
                     case immigrationAllNeighbors:    // from all neighbors
+                        if (neighborGroup) {
+                            numMigrants = d->ran->poisson(migrationRate * neighborGroup->emigrationPotential);
+                        }
+                        break;
                     case immigrationStrongNeighbor:  // from neighbor selected according to emigrationPotential
-                        if (neighborDeme) {
-                            numMigrants = d->ran->poisson(migrationRate * neighborDeme->emigrationPotential);
+                        if (neighborGroup) {
+                            numMigrants = d->ran->poisson(migrationRate * neighborGroup->nn);
                         }
                         break;
                     case immigrationProportional:    // prop. w. population, from neighbor
-                        numMigrants = d->ran->poisson(migrationRate * deme->nn);
+                        numMigrants = d->ran->poisson(migrationRate * group->nn);
                         break;
                     case immigrationVacant:          // prop. w. vacant capacity, from neighbor
-                        numMigrants = deme->nmax - deme->nn + 1;
+                        numMigrants = group->nmax - group->nn + 1;
                         if (numMigrants < 0) numMigrants = 0;
                         else numMigrants = d->ran->poisson(migrationRate * numMigrants);
                         break;
@@ -795,88 +799,88 @@ void islandGenerationFunction(AltruData * d, int state) {
                 }
 
                 // get migrant genes
-                if (neighborDeme && numMigrants > 0) {
-                    if (numMigrants > neighborDeme->nn) numMigrants = neighborDeme->nn;
+                if (neighborGroup && numMigrants > 0) {
+                    if (numMigrants > neighborGroup->nn) numMigrants = neighborGroup->nn;
                     // select migrant genes
-                    int32_t gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborDeme->gAltruism[0], neighborDeme->nn * 2);
+                    int32_t gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborGroup->gAltruism[0], neighborGroup->nn * 2);
                     int32_t gmig1 = numMigrants * 2 - gmig0;
-                    deme->gAltruism[0] += gmig0;           // add migrant genes to current deme
-                    deme->gAltruism[1] += gmig1;
-                    deme->nn += numMigrants;
-                    neighborDeme->gAltruism[0] -= gmig0;   // subtract migrant genes from neighbor deme
-                    neighborDeme->gAltruism[1] -= gmig1;
+                    group->gAltruism[0] += gmig0;           // add migrant genes to current group
+                    group->gAltruism[1] += gmig1;
+                    group->nn += numMigrants;
+                    neighborGroup->gAltruism[0] -= gmig0;   // subtract migrant genes from neighbor group
+                    neighborGroup->gAltruism[1] -= gmig1;
 #ifdef MORELOCI
                     if (d->locusUsed[locusEndogamy]) {
-                        gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborDeme->gEndogamy[0], neighborDeme->nn * 2);
+                        gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborGroup->gEndogamy[0], neighborGroup->nn * 2);
                         gmig1 = numMigrants * 2 - gmig0;
-                        deme->gEndogamy[0] += gmig0;       // add colonist genes to current deme
-                        deme->gEndogamy[1] += gmig1;
-                        neighborDeme->gEndogamy[0] -= gmig0; // subtract colonist genes from neighbor deme
-                        neighborDeme->gEndogamy[1] -= gmig1;
+                        group->gEndogamy[0] += gmig0;       // add colonist genes to current group
+                        group->gEndogamy[1] += gmig1;
+                        neighborGroup->gEndogamy[0] -= gmig0; // subtract colonist genes from neighbor group
+                        neighborGroup->gEndogamy[1] -= gmig1;
                     }
                     if (d->locusUsed[locusConformity]) {
-                        gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborDeme->gConformity[0], neighborDeme->nn * 2);
+                        gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborGroup->gConformity[0], neighborGroup->nn * 2);
                         gmig1 = numMigrants * 2 - gmig0;
-                        deme->gConformity[0] += gmig0;     // add colonist genes to current deme
-                        deme->gConformity[1] += gmig1;
-                        neighborDeme->gConformity[0] -= gmig0; // subtract colonist genes from neighbor deme
-                        neighborDeme->gConformity[1] -= gmig1;
+                        group->gConformity[0] += gmig0;     // add colonist genes to current group
+                        group->gConformity[1] += gmig1;
+                        neighborGroup->gConformity[0] -= gmig0; // subtract colonist genes from neighbor group
+                        neighborGroup->gConformity[1] -= gmig1;
                     }
 #endif
-                    neighborDeme->nn -= numMigrants;
+                    neighborGroup->nn -= numMigrants;
                     d->migrantsTot += numMigrants;         // count total number of migrants
                 }
             }
 
             // limit population
-            if (deme->nn > deme->nmax) {
-                int32_t nn2 = deme->nmax * 2; // number of genes after population limitation
-                int32_t g0 = d->ran->hypergeometric(nn2, deme->gAltruism[0], deme->nn * 2);
+            if (group->nn > group->nmax) {
+                int32_t nn2 = group->nmax * 2; // number of genes after population limitation
+                int32_t g0 = d->ran->hypergeometric(nn2, group->gAltruism[0], group->nn * 2);
                 int32_t g1 = nn2 - g0;
-                deme->gAltruism[0] = g0;
-                deme->gAltruism[1] = g1;
+                group->gAltruism[0] = g0;
+                group->gAltruism[1] = g1;
 #ifdef MORELOCI
                 if (d->locusUsed[locusEndogamy]) {
-                    g0 = d->ran->hypergeometric(nn2, deme->gEndogamy[0], deme->nn * 2);
+                    g0 = d->ran->hypergeometric(nn2, group->gEndogamy[0], group->nn * 2);
                     g1 = nn2 - g0;
-                    deme->gEndogamy[0] = g0;  // add migrant genes to current deme
-                    deme->gEndogamy[1] = g1;
+                    group->gEndogamy[0] = g0;  // add migrant genes to current group
+                    group->gEndogamy[1] = g1;
                 }
                 if (d->locusUsed[locusConformity]) {
-                    g0 = d->ran->hypergeometric(nn2, deme->gConformity[0], deme->nn * 2);
+                    g0 = d->ran->hypergeometric(nn2, group->gConformity[0], group->nn * 2);
                     g1 = nn2 - g0;
-                    deme->gConformity[0] = g0; // add migrant genes to current deme
-                    deme->gConformity[1] = g1;
+                    group->gConformity[0] = g0; // add migrant genes to current group
+                    group->gConformity[1] = g1;
                 }
 #endif
-                deme->nn = deme->nmax;
+                group->nn = group->nmax;
             }
-            //!!
-            errorCheck(d, deme);    
+
+            errorCheck(d, group);    // may be removed
         }
 
-        // deme loop 3: update global gene pool and statistics
-        for (ideme = 0; ideme < d->maxIslands; ideme++) {
-            deme = (IslandDeme*)(d->demeData) + ideme;     // point to current deme
-            d->genePool[locusAltruism][0] += deme->gAltruism[0];
-            d->genePool[locusAltruism][1] += deme->gAltruism[1];
+        // group loop 3: update global gene pool and statistics
+        for (iGroup = 0; iGroup < d->maxIslands; iGroup++) {
+            group = (IslandGroup*)(d->groupData) + iGroup;     // point to current group
+            d->genePool[locusAltruism][0] += group->gAltruism[0];
+            d->genePool[locusAltruism][1] += group->gAltruism[1];
 #ifdef MORELOCI
-            d->genePool[locusEndogamy][0] += deme->gEndogamy[0];
-            d->genePool[locusEndogamy][1] += deme->gEndogamy[1];
-            d->genePool[locusConformity][0] += deme->gConformity[0];
-            d->genePool[locusConformity][1] += deme->gConformity[1];
+            d->genePool[locusEndogamy][0] += group->gEndogamy[0];
+            d->genePool[locusEndogamy][1] += group->gEndogamy[1];
+            d->genePool[locusConformity][0] += group->gConformity[0];
+            d->genePool[locusConformity][1] += group->gConformity[1];
 #endif
-            d->totalPopulation += deme->nn;
-            d->totalPhenotypes[locusAltruism] += deme->altruists;
-            if (deme->groupfit > 0.5f) d->altruistDemes++; //else d->egoistDemes++;
-            if (deme->nn >= d->minGroupSize) d->inhabitedDemes++;
-            deme->age++;
+            d->totalPopulation += group->nn;
+            d->totalPhenotypes[locusAltruism] += group->altruists;
+            if (group->groupfit > 0.5f) d->altruistGroups++;
+            if (group->nn >= d->minGroupSize) d->inhabitedGroups++;
+            group->age++;
         }
 
         // make migrant pool
         if (d->migrationTopology == topologyCommonPool || d->colonizationPattern == colonizationCommonPool) {  // migrant pool used
             // migrant pool placed last in memory block
-            IslandDeme * migrantPool = (IslandDeme*)(d->demeData) + d->maxIslands;
+            IslandGroup * migrantPool = (IslandGroup*)(d->groupData) + d->maxIslands;
             double reduction = 1.;
             if (d->totalPopulation > 100000000) {  // avoid overflow
                 reduction = 100000000. / d->totalPopulation;

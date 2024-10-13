@@ -1,8 +1,8 @@
 /****************************  graphics.cpp   *********************************
 * Author:        Agner Fog
 * Date created:  2023-08-07
-* Last modified: 2023-12-31
-* Version:       3.00.00
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines functions for drawing a geograpic map with islands
@@ -103,49 +103,49 @@ void AltruistView::drawIslands() {
     d->numRows = numRows;
     int32_t row, column;
     int32_t index = 0;
-    int8_t * deme;                               // point to current deme
+    int8_t * group;                              // point to current group
     int maxSquare = gridUnit - 4;                // max size of squares in graphics
     if (maxSquare < 2) maxSquare = 2;
 
-    // inspect deme descriptor to find offset for size and deme count
-    int32_t nn = 0;                              // deme population
-    int32_t nref = d->nMaxPerDeme;               // max deme population
+    // inspect group descriptor to find offset for size and group count
+    int32_t nn = 0;                              // group population
+    int32_t nref = d->nMaxPerGroup;               // max group population
     int32_t ga0 = 0;                             // gene count for mutant at primary locus. determines hue or first color
     int32_t ga1 = 0;                             // gene count for mutant at secondary locus. determines second color
     int32_t ga2 = 0;                             // gene count for mutant at third locus. determines third color
     float groupProperty = 0;                     // group fitness or other group property
-    int onn = -1;                                // offset of population count in deme data structure
-    int oga0 = 0;                                // offset of locus 0 mutant gene in deme data structure
-    int oga1 = 0;                                // offset of locus 1 mutant gene in deme data structure
-    int oga2 = 0;                                // offset of locus 2 mutant gene in deme data structure
-    int oGroupProperty = 0;                      // offset of groupProperty in deme data structure
+    int onn = -1;                                // offset of population count in group data structure
+    int oga0 = 0;                                // offset of locus 0 mutant gene in group data structure
+    int oga1 = 0;                                // offset of locus 1 mutant gene in group data structure
+    int oga2 = 0;                                // offset of locus 2 mutant gene in group data structure
+    int oGroupProperty = 0;                      // offset of groupProperty in group data structure
     int varType = 0;
     int oddMove = 0;                             // shift of odd rows in honeycomb organization
     int g;      // graphics field type
-    int i = 0;  // index into demeFields
-    do {    // search through deme descriptor list
-        g = d->currentModel->demeFields[i].graphics;
+    int i = 0;  // index into groupFields
+    do {    // search through group descriptor list
+        g = d->currentModel->groupFields[i].graphics;
         switch (g) {
         case 3:   // field contains population size
-            onn = d->currentModel->demeFields[i].offset;
-            varType = d->currentModel->demeFields[i].varType; 
+            onn = d->currentModel->groupFields[i].offset;
+            varType = d->currentModel->groupFields[i].varType; 
             break;
         case 10:  // field contains first gene count used for selecting color
-            oga0 = d->currentModel->demeFields[i].offset;
+            oga0 = d->currentModel->groupFields[i].offset;
             break;
         case 11:  // field contains second gene count used for selecting color
-            if (d->locusUsed[1]) oga1 = d->currentModel->demeFields[i].offset;
+            if (d->locusUsed[1]) oga1 = d->currentModel->groupFields[i].offset;
             break;
         case 12:  // field contains third gene count used for selecting color
-            if (d->locusUsed[2]) oga2 = d->currentModel->demeFields[i].offset;
+            if (d->locusUsed[2]) oga2 = d->currentModel->groupFields[i].offset;
             break;
         case 20:  // field contains group property
-            if (d->currentModel->demeFields[i].varType == varFloat) { // float            
-                oGroupProperty = d->currentModel->demeFields[i].offset;
+            if (d->currentModel->groupFields[i].varType == varFloat) { // float            
+                oGroupProperty = d->currentModel->groupFields[i].offset;
             }
             break;
         }
-    } while (d->currentModel->demeFields[i++].type != 0);  // deme descriptor list ends with 0 
+    } while (d->currentModel->groupFields[i++].type != 0);  // group descriptor list ends with 0 
 
     // loop through rows and columns
     for (row = 0; row < numRows; row++) {
@@ -158,19 +158,19 @@ void AltruistView::drawIslands() {
         for (column = 0; column < numColumns; column++) {
             index = row * numColumns + column;
             if (index >= d->nIslands || index >= maxIslandsShown) break;  // stop if last row is incomplete or too many islands
-            deme = d->demeData + index * d->demeStructureSize; // point to current deme
-            // extract data for this deme according to structure defined in deme descriptors:
+            group = d->groupData + index * d->groupStructureSize; // point to current group
+            // extract data for this group according to structure defined in group descriptors:
             if (varType == varInt16) {
-                if (onn >= 0) nn = *(int16_t*)(deme + onn);
-                if (oga0) ga0 = *(int16_t*)(deme + oga0);
-                if (oga1) ga1 = *(int16_t*)(deme + oga1);
-                if (oga2) ga2 = *(int16_t*)(deme + oga2);
+                if (onn >= 0) nn = *(int16_t*)(group + onn);
+                if (oga0) ga0 = *(int16_t*)(group + oga0);
+                if (oga1) ga1 = *(int16_t*)(group + oga1);
+                if (oga2) ga2 = *(int16_t*)(group + oga2);
             }
             else if (varType == varInt32) {
-                if (onn >= 0) nn = *(int32_t*)(deme + onn);
-                if (oga0) ga0 = *(int32_t*)(deme + oga0);
-                if (oga1) ga1 = *(int32_t*)(deme + oga1);
-                if (oga2) ga2 = *(int32_t*)(deme + oga2);
+                if (onn >= 0) nn = *(int32_t*)(group + onn);
+                if (oga0) ga0 = *(int32_t*)(group + oga0);
+                if (oga1) ga1 = *(int32_t*)(group + oga1);
+                if (oga2) ga2 = *(int32_t*)(group + oga2);
             }
 
             // use sqrt to make area proportional with population
@@ -645,56 +645,56 @@ void AltruistView::drawTerritories() {
     int polygonsIndex = 0;                       // index to polygons
     int textIndex = 0;                           // index to text items
 
-    // inspect deme descriptor to find offset for size and deme count
-    int32_t nn = 0;                              // deme population
+    // inspect group descriptor to find offset for size and group count
+    int32_t nn = 0;                              // group population
     int32_t ga = 0;                              // gene count for mutant at primary locus. determines hue or first color
     int32_t tArea = 0;                           // area of territory
     float groupProperty = 0;                     // group fitness or other group property
-    int onn = -1;                                // offset of population count in deme data structure
-    int oga0 = 0;                                // offset of locus 0 mutant gene in deme data structure
-    int oGroupProperty = 0;                      // offset of groupProperty in deme data structure
+    int onn = -1;                                // offset of population count in group data structure
+    int oga0 = 0;                                // offset of locus 0 mutant gene in group data structure
+    int oGroupProperty = 0;                      // offset of groupProperty in group data structure
     int oArea = 0;                               // offset to territory area
     int varType = 0;
     int g;      // graphics field type
-    int i = 0;  // index into demeFields
-    do {    // search through deme descriptor list
-        g = d->currentModel->demeFields[i].graphics;
+    int i = 0;  // index into groupFields
+    do {    // search through group descriptor list
+        g = d->currentModel->groupFields[i].graphics;
         switch (g) {
         case 3:   // field contains population size
-            onn = d->currentModel->demeFields[i].offset;
-            varType = d->currentModel->demeFields[i].varType; 
+            onn = d->currentModel->groupFields[i].offset;
+            varType = d->currentModel->groupFields[i].varType; 
             break;
         case 6:   // field contains area of territory
-            oArea = d->currentModel->demeFields[i].offset;
+            oArea = d->currentModel->groupFields[i].offset;
             break;
         case 10:  // field contains first gene count used for selecting color
-            oga0 = d->currentModel->demeFields[i].offset;
+            oga0 = d->currentModel->groupFields[i].offset;
             break;
         case 20:  // field contains group property
-            if (d->currentModel->demeFields[i].varType == varFloat) { // float            
-                oGroupProperty = d->currentModel->demeFields[i].offset;
+            if (d->currentModel->groupFields[i].varType == varFloat) { // float            
+                oGroupProperty = d->currentModel->groupFields[i].offset;
             }
             break;
         }
-    } while (d->currentModel->demeFields[i++].type != 0);  // deme descriptor list ends with 0
+    } while (d->currentModel->groupFields[i++].type != 0);  // group descriptor list ends with 0
 
     int graphUnit = xAxisLength / d->rowLengthTerri;       // graphics unit
     if (graphUnit < 1) graphUnit = 1;
 
     Habitat terrain(d);                                    // for manipulating graphics points
 
-    int8_t * deme;                                         // current deme territory
+    int8_t * group;                                        // current group territory
     int32_t areaMedium = (d->territorySizeMax + d->territorySizeMin) / 2; // limit between big and small territories
-    // loops through demes
+    // loops through groups
     for (int sizeCategory = 0; sizeCategory <= 1; sizeCategory++) {
-        for (int iDeme = 1; iDeme <= d->nIslands; iDeme++) {
-            // get data for this deme                        
-            deme = d->demeData + iDeme * d->demeStructureSize; // point to current deme
-            // extract data for this deme according to structure defined in deme descriptors:
+        for (int iGroup = 1; iGroup <= d->nIslands; iGroup++) {
+            // get data for this group                        
+            group = d->groupData + iGroup * d->groupStructureSize; // point to current group
+            // extract data for this group according to structure defined in group descriptors:
             if (varType == varInt32) {
-                if (onn >= 0) nn = *(int32_t*)(deme + onn);
-                if (oga0) ga = *(int32_t*)(deme + oga0);
-                if (oArea) tArea = *(int32_t*)(deme + oArea);
+                if (onn >= 0) nn = *(int32_t*)(group + onn);
+                if (oga0) ga = *(int32_t*)(group + oga0);
+                if (oArea) tArea = *(int32_t*)(group + oArea);
             }
             if (tArea == 0) continue;                      // skip unused record
             // even though enclaves are rare, we want to be able to show them.
@@ -704,11 +704,11 @@ void AltruistView::drawTerritories() {
                 // define polygon
                 QPolygonF shape;
                 // find a point on border of territory
-                TerriDeme * tdeme = (TerriDeme *)(deme);
-                TPoint borderPoint = terrain.findBorder2(tdeme); // avoid border to an enclave
+                TerriGroup * tGroup = (TerriGroup *)(group);
+                TPoint borderPoint = terrain.findBorder2(tGroup); // avoid border to an enclave
 
                 // walk around border of territory to draw a polygon
-                terrain.borderWalk(tdeme->id, borderPoint, [graphUnit, &shape](TPoint&p_1) {
+                terrain.borderWalk(tGroup->id, borderPoint, [graphUnit, &shape](TPoint&p_1) {
                     // do_us lambda function
                     shape << QPointF(p_1.x * graphUnit, p_1.y * graphUnit); // add border point to polygon
                     },
@@ -784,7 +784,7 @@ void AltruistView::mouseHandlerIslands(int x, int y) {
     int32_t numRows = d->numRows;
     int32_t row, column;
     int32_t index = 0;
-    int8_t * deme;                               // point to current deme
+    int8_t * group;                              // point to current group
     int maxSquare = gridUnit - 4;                // max size of squares in graphics
     if (maxSquare < 2) maxSquare = 2;
     int maxDist = maxSquare * 2;                 // maximum distance from edges of drawing
@@ -799,7 +799,7 @@ void AltruistView::mouseHandlerIslands(int x, int y) {
     // get island index
     index = row * numRows + column;
     // make message box
-    demeDescriptionMessageBox(index, d);
+    groupDescriptionMessageBox(index, d);
 }
 
 void AltruistView::mouseHandlerTerritories(int x, int y) {
@@ -818,12 +818,12 @@ void AltruistView::mouseHandlerTerritories(int x, int y) {
     int owner = terrain.owner(TPoint(xx,yy));
     if (owner <= 0 || owner > d->nIslands) return;
     // make message box
-    demeDescriptionMessageBox(owner, d);
+    groupDescriptionMessageBox(owner, d);
 }
 
-void demeDescriptionMessageBox(int id, AltruData * d) {
-    // make a message box showing the contents of a deme record
-    int8_t * deme = d->demeData + id * d->demeStructureSize; // point to current deme
+void groupDescriptionMessageBox(int id, AltruData * d) {
+    // make a message box showing the contents of a group record
+    int8_t * group = d->groupData + id * d->groupStructureSize; // point to current group
 
     // make text with variable values
     const int textsize = 1024;
@@ -831,42 +831,42 @@ void demeDescriptionMessageBox(int id, AltruData * d) {
     text[0] = 0;
     int textlen = 0;
 
-    // search deme field descriptor for variables to show
-    int offset;                                      // offset into deme data structure
+    // search group field descriptor for variables to show
+    int offset;                                      // offset into group data structure
     int g;                                           // graphics field type
-    int i = 0;                                       // index into demeFields
+    int i = 0;                                       // index into groupFields
     int32_t xi;                                      // integer variable
     double xf;                                       // floating point variable
-    do {    // search through deme descriptor list
-        g = d->currentModel->demeFields[i].graphics; // graphics display info
+    do {    // search through group descriptor list
+        g = d->currentModel->groupFields[i].graphics; // graphics display info
         if (g == 10 && !d->locusUsed[0]) continue;   // don't show unused locus
         if (g == 11 && !d->locusUsed[1]) continue;   // don't show unused locus
         if (g == 12 && !d->locusUsed[2]) continue;   // don't show unused locus
         if (g == 13 && !d->locusUsed[3]) continue;   // don't show unused locus
 
         if (g != 0) {
-            textlen += snprintf(text + strlen(text), textsize - textlen, "\n%s", d->currentModel->demeFields[i].name);
-            offset = d->currentModel->demeFields[i].offset;
-            switch (d->currentModel->demeFields[i].varType) {
+            textlen += snprintf(text + strlen(text), textsize - textlen, "\n%s", d->currentModel->groupFields[i].name);
+            offset = d->currentModel->groupFields[i].offset;
+            switch (d->currentModel->groupFields[i].varType) {
             case varInt16:
-                xi = *(int16_t*)(deme + offset);
+                xi = *(int16_t*)(group + offset);
                 textlen += snprintf(text + strlen(text), textsize - textlen, " = %i", xi);
                 break;
             case varInt32:
-                xi = *(int32_t*)(deme + offset);
+                xi = *(int32_t*)(group + offset);
                 textlen += snprintf(text + strlen(text), textsize - textlen, " = %i", xi);
                 break;
             case varFloat:
-                xf = *(float*)(deme + offset);
+                xf = *(float*)(group + offset);
                 textlen += snprintf(text + strlen(text), textsize - textlen, " = %.3G", xf);
                 break;
             case varDouble:
-                xf = *(double*)(deme + offset);
+                xf = *(double*)(group + offset);
                 textlen += snprintf(text + strlen(text), textsize - textlen, " = %.3G", xf);
                 break; 
             }        
         }
-    } while (d->currentModel->demeFields[i++].type != 0);  // deme descriptor list ends with 0 
+    } while (d->currentModel->groupFields[i++].type != 0);  // group descriptor list ends with 0 
 
     // make heading
     char heading[64];

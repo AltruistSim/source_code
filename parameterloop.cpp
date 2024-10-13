@@ -1,8 +1,8 @@
 /**************************  parameterloop.cpp   ******************************
 * Author:        Agner Fog
 * Date created:  1995-02-10
-* Last modified: 2024-06-22
-* Version:       3.001
+* Last modified: 2024-09-19
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file controls parameter loops that let you run multiple simulations
@@ -28,12 +28,12 @@ struct SweepParameter {
 SweepParameter sweepParameterList[] = {
     {altruDataOffset(seed), varInt32, 1, -1, -1, "random seed"},
     {altruDataOffset(migrationRate[0]), varFloat, 2, 0x1000, 0, "migration rate"},
-    {altruDataOffset(fitExpo), varFloat, 1, 0, 0x1000, "group fitness exponent"},
+    {altruDataOffset(groupFitCurvature), varFloat, 1, 0, 0x1000, "group fitness curvature"},
     {altruDataOffset(fit[2]), varFloat, 2, -1, -1, "altruist fitness"},
     {altruDataOffset(fit[0]), varFloat, 8, 0, -1, "individual fitness ratio"},  // fitness ratio of altruists over egoists
     {altruDataOffset(extinctionRate[0]), varFloat, 2, 0, 2, "extinction rate for egoist groups"},
     {altruDataOffset(warIntensity), varFloat, 1, 0, 0x80, "war intensity"},
-    {altruDataOffset(nMaxPerDeme), varInt32, 1, 0x04, 0, "max group size"},    
+    {altruDataOffset(nMaxPerGroup), varInt32, 1, 0x04, 0, "max group size"},    
     {altruDataOffset(carryingCapacity), varFloat, 2, 0x10, 0, "carrying capacity"},
     {altruDataOffset(colonySize), varInt32, 1, 0x200, 0, "colony size"},
     {altruDataOffset(surviv), varFloat, 1, 0, 0x10, "survival rate"},
@@ -109,7 +109,7 @@ void ParameterLoop::setup(int iSweep, Worker * worker) {
         d->sweepStep[iSweep] = increment;
     }
     if (direction) increment = -fabs(increment);
-    isFitExpo = varOffset == altruDataOffset(fitExpo);  // fitExpo requires special treatment
+    isFitExpo = varOffset == altruDataOffset(groupFitCurvature);  // groupFitCurvature requires special treatment
     // check if valid
     if (type == 2 && varType < varFloat) {
         errors.reportError("Search not possible for integer variable");

@@ -2,7 +2,7 @@
 * Author:        Agner Fog
 * Date created:  2002-10-20
 * Last modified: 2024-05-10
-* Version:       3.001
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines Wallenius' and Fisher's noncentral hypergeometric distributions

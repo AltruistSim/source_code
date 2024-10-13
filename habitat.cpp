@@ -1,8 +1,8 @@
 /****************************  habitat.cpp   **********************************
 * Author:        Agner Fog
 * Date created:  2023-09-10
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines functions for manipulating territories
@@ -123,7 +123,7 @@ void Habitat::setData(AltruData * d) {                        // set all data
 
 // Find an arbitrary point on the border of a territory.
 // The return value is a point on the border
-TPoint Habitat::findBorder(TerriDeme const * d1) const {
+TPoint Habitat::findBorder(TerriGroup const * d1) const {
     if (d1->id == 0) return TPoint(0, 0);
     // find a point that is mine
     TPoint p0(d1->centerx, d1->centery);
@@ -148,7 +148,7 @@ TPoint Habitat::findBorder(TerriDeme const * d1) const {
 // The return value is a point on the border
 // This is the same as findBorder, but this version tries to avoid border to an enclave.
 // This is pretty slow, but necessary for graphics output
-TPoint Habitat::findBorder2(TerriDeme const * d1) const {
+TPoint Habitat::findBorder2(TerriGroup const * d1) const {
     if (d1->id == 0) return TPoint(0, 0);
     // find a point that is mine
     int dir = 0;
@@ -213,7 +213,7 @@ TPoint Habitat::findBorder2(TerriDeme const * d1) const {
 // all points in the entire area be checked, which would be extremely
 // time-consuming. The possible failure will be extremely rare and without
 // serious consequences.
-int Habitat::findNeighbors(TerriDeme const * const d1, Neighbor * const neighborList, int * const numNeighbors) const {
+int Habitat::findNeighbors(TerriGroup const * const d1, Neighbor * const neighborList, int * const numNeighbors) const {
     int i;                        // loop counter
     TPoint p0;                    // starting point
     TPoint p3;                    // search for border, start of section
@@ -299,7 +299,7 @@ int Habitat::findNeighbors(TerriDeme const * const d1, Neighbor * const neighbor
 
 // check of d1 and d2 are neighbors
 // returns a point on neighbor border if true, TPoint(0,0) if not
-TPoint Habitat::isNeighbor(TerriDeme const * d1, idType d2) const {
+TPoint Habitat::isNeighbor(TerriGroup const * d1, idType d2) const {
     bool found = false;
     TPoint p1 = findBorder(d1);
     TPoint pn(0, 0);  // neighbor point
@@ -315,7 +315,7 @@ TPoint Habitat::isNeighbor(TerriDeme const * d1, idType d2) const {
 
 
 // transfer na units of land from owner 'nfrom' to conqueror 'to'
-void Habitat::conquer(TerriDeme * from, TerriDeme * to, int32_t na, Neighbor const * nfrom) const {
+void Habitat::conquer(TerriGroup * from, TerriGroup * to, int32_t na, Neighbor const * nfrom) const {
     // Transfer 'na' bits of land from territory 'from'
     // to 'to'. 'nfrom' is information returned by
     // function findNeighbors on the 'from' territory.
@@ -401,7 +401,7 @@ void Habitat::conquer(TerriDeme * from, TerriDeme * to, int32_t na, Neighbor con
     }
    
 
-    // update information in demes after transfer
+    // update information in groups after transfer
     updateTerr(from, to, tarea, sx, sy, d->carryingCapacity[0]);
 
     if (tarea < na) {
@@ -513,16 +513,16 @@ int32_t Habitat::floodFill(TPoint const & p, idType newOwner) const {
         }
     }
 
-    // update information in demes after transfer
-    TerriDeme * from = (TerriDeme*)(d->demeData) + oldOwner;
-    TerriDeme * to   = (TerriDeme*)(d->demeData) + newOwner;
+    // update information in groups after transfer
+    TerriGroup * from = (TerriGroup*)(d->groupData) + oldOwner;
+    TerriGroup * to   = (TerriGroup*)(d->groupData) + newOwner;
     updateTerr(from, to, tarea, sx, sy, d->carryingCapacity[0]);
     return (int32_t)tarea;
 }
 
 
 // split territory into two, the second with area ar
-void Habitat::splitArea(TerriDeme * oldOwner, TerriDeme * newOwner, int32_t ar) const {
+void Habitat::splitArea(TerriGroup * oldOwner, TerriGroup * newOwner, int32_t ar) const {
 
     // split territory into two. area of new territory is ar
     if (ar >= oldOwner->area || int32_t(ar) <= 0) return;
@@ -559,7 +559,7 @@ void Habitat::splitArea(TerriDeme * oldOwner, TerriDeme * newOwner, int32_t ar) 
 
 
 // update information in both territories after transfer of land
-void Habitat::updateTerr(TerriDeme * oldOwner, TerriDeme * newOwner, int32_t tarea, uint32_t sx, uint32_t sy, float popDens) const {
+void Habitat::updateTerr(TerriGroup * oldOwner, TerriGroup * newOwner, int32_t tarea, uint32_t sx, uint32_t sy, float popDens) const {
     // update information in both territories after transfer
     oldOwner->sx -= sx; oldOwner->sy -= sy;
     oldOwner->area -= tarea;
@@ -591,7 +591,7 @@ void Habitat::updateTerr(TerriDeme * oldOwner, TerriDeme * newOwner, int32_t tar
 
 // find a point belonging to a territory in the rare case that 
 // it does not own its own center of gravity
-TPoint Habitat::findCenter(TerriDeme const * d1) const {
+TPoint Habitat::findCenter(TerriGroup const * d1) const {
     if (d1->area == 0) return TPoint(0,0);
     int32_t x, x1, x2, y, y1, y2;                // coordinates
     int32_t radius;
@@ -621,7 +621,7 @@ TPoint Habitat::findCenter(TerriDeme const * d1) const {
 }
 
 // check if a territory is contiguous. This is used for debugging only
-void Habitat::checkIfContiguous(TerriDeme const * d1) const {
+void Habitat::checkIfContiguous(TerriGroup const * d1) const {
     if (d1->area == 0) return;
     bool * checkmap = new bool[d->totArea+1]();
     TPoint p = findCenter(d1);
@@ -680,20 +680,20 @@ void checkAllTerritories (AltruData * d) {
         }
     }
 
-    int ideme;
-    TerriDeme * deme;
-    for (ideme = 1; ideme <= d->nIslands; ideme++) {
-        deme = (TerriDeme*)(d->demeData) + ideme; // point to current deme
-        if (deme->area != areaSums[ideme]) {
+    int iGroup;
+    TerriGroup * group;
+    for (iGroup = 1; iGroup <= d->nIslands; iGroup++) {
+        group = (TerriGroup*)(d->groupData) + iGroup; // point to current group
+        if (group->area != areaSums[iGroup]) {
             errors.reportError("Territory area wrong");
         }
-        if (deme->sx != xSums[ideme] || deme->sy != ySums[ideme]) {
+        if (group->sx != xSums[iGroup] || group->sy != ySums[iGroup]) {
             errors.reportError("Territory coordinate sums wrong");
         }
-        if (deme->area > d->territorySizeMax * 4) {
+        if (group->area > d->territorySizeMax * 4) {
             //errors.reportError("Territory area too big");         
         }
-        if (deme->area > 0 && deme->area < d->territorySizeMin / 4) {
+        if (group->area > 0 && group->area < d->territorySizeMin / 4) {
             //errors.reportError("Territory area too small");         
         }
     }
@@ -732,5 +732,5 @@ void checkArea(AltruData * d) {
             d->minGroupSize = d->territorySizeMin * d->carryingCapacity[0] * 0.5f;
         }
     }
-    d->nMaxPerDeme = (int32_t)lround(d->territorySizeMax * d->carryingCapacity[locusAltruism]);
+    d->nMaxPerGroup = (int32_t)lround(d->territorySizeMax * d->carryingCapacity[locusAltruism]);
 }

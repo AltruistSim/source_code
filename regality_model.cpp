@@ -1,13 +1,15 @@
 /**************************  regality_model.cpp   *****************************
 * Author:        Agner Fog
 * Date created:  2023-10-03
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the regality model where groups can steal territory
 * from each other, and the military strength depends on common support for
-* a strong leader.
+* a strong leader. 
+* See: Fog, A: Warlike and Peaceful Societies. Open Book Publishers, 2017.
+* https://doi.org/10.11647/obp.0128
 *
 * (c) Copyright 2023-2024 Agner Fog.
 * GNU General Public License, version 3.0 or later
@@ -34,9 +36,9 @@ static int const numUser = 0;                    // number of userData
 const int locusRegality = locusAltruism;         // locus for regality gene
 
 /*
-struct DemeFieldDescriptor {
+struct GroupFieldDescriptor {
     int32_t type;            // 0: end of list, 
-                             // 1: size of Deme structure, 
+                             // 1: size of group structure, 
                              // 2: carrying capacity (max individuals)
                              // 3: population (number of individuals)
                              // 4: gene count, 
@@ -44,13 +46,13 @@ struct DemeFieldDescriptor {
                              // 6: area
                              // 8: group property
     int32_t varType;         // varInt16 or varInt32 or varFloat
-    int32_t offset;          // offset into Deme structure
+    int32_t offset;          // offset into group structure
     int32_t statistic;       // 1: calculate sum, 2: calculate mean
                              // 4: possible stop criterion, stop when above certain value
                              // 8: possible stop criterion, stop when below certain value
     int32_t graphics;        // show in graphics display:
                              // 2:  max size
-                             // 3:  population. divide by max size or nMaxPerDeme to get relative size
+                             // 3:  population. divide by max size or nMaxPerGroup to get relative size
                              // 6:  area. divide by territorySizeMax to get relative size
                              // 10: gene count for mutant, primary locus
                              // 11: gene count for mutant, secondary locus
@@ -59,17 +61,17 @@ struct DemeFieldDescriptor {
     const char * name;       // name of variable
 }; */
 
-// List of fields in Deme structure
-static const DemeFieldDescriptor regalityDemeDescriptors[] = {
-    {1, varInt32, sizeof(TerriDeme), 0, 0, 0},
-    {3, varInt32, demeFieldOffset(TerriDeme,nn),           0, 3,  "population"},
-    {2, varInt32, demeFieldOffset(TerriDeme,nmax),         0, 2,  "carrying capacity"},
-    {6, varInt32, demeFieldOffset(TerriDeme,area),         2, 6,  "area"},
-    {4, varInt32, demeFieldOffset(TerriDeme,gAltruism[0]), 8, 10, "neutral gene"},
-    {4, varInt32, demeFieldOffset(TerriDeme,gAltruism[1]), 5, 10, "regality gene"},
-    {8, varInt16, demeFieldOffset(TerriDeme,age),          0, 20, "age"},
-    {8, varFloat, demeFieldOffset(TerriDeme,groupfit),     2, 20, "group fitness"},
-    {8, varInt32, demeFieldOffset(TerriDeme,emigrationPotential), 0, 20, "emigration potential"},
+// List of fields in group structure
+static const GroupFieldDescriptor regalityGroupDescriptors[] = {
+    {1, varInt32, sizeof(TerriGroup), 0, 0, 0},
+    {3, varInt32, groupFieldOffset(TerriGroup,nn),           0, 3,  "population"},
+    {2, varInt32, groupFieldOffset(TerriGroup,nmax),         0, 2,  "carrying capacity"},
+    {6, varInt32, groupFieldOffset(TerriGroup,area),         2, 6,  "area"},
+    {4, varInt32, groupFieldOffset(TerriGroup,gAltruism[0]), 8, 10, "neutral gene"},
+    {4, varInt32, groupFieldOffset(TerriGroup,gAltruism[1]), 5, 10, "regality gene"},
+    {8, varInt16, groupFieldOffset(TerriGroup,age),          0, 20, "age"},
+    {8, varFloat, groupFieldOffset(TerriGroup,groupfit),     2, 20, "group fitness"},
+    {8, varInt32, groupFieldOffset(TerriGroup,emigrationPotential), 0, 20, "emigration potential"},
     {0, 0, 0, 0, 0, 0}   // mark end of list
 };
 
@@ -84,7 +86,7 @@ static const ModelDescriptor regalityModel = {
     "Groups have dynamic territories. A strong group can conquer territory from a weaker neighbor group. "
     "Group strength depends on common support for a strong leader.",
     regalityParameterDefinitions,
-    regalityDemeDescriptors,
+    regalityGroupDescriptors,
     &regalityInitFunction,
     &regalityGenerationFunction
 };
@@ -95,12 +97,12 @@ Construct regalityConstructor(regalityModel);
 
 // allocate memory buffers
 static void allocateMemory(AltruData * d) {
-    // allocate deme list
-    if (d->bufferSize < (d->maxIslands + 1) * sizeof(TerriDeme)) {
-        if (d->bufferSize) delete[] d->demeData; // delete any previous smaller buffer
-        d->demeData = new int8_t[(d->maxIslands + 1) * sizeof(TerriDeme)]();
-        if (d->demeData == 0) errors.reportError("memory allocation failed");
-        else d->bufferSize = (d->maxIslands + 1) * sizeof(TerriDeme);
+    // allocate group list
+    if (d->bufferSize < (d->maxIslands + 1) * sizeof(TerriGroup)) {
+        if (d->bufferSize) delete[] d->groupData; // delete any previous smaller buffer
+        d->groupData = new int8_t[(d->maxIslands + 1) * sizeof(TerriGroup)]();
+        if (d->groupData == 0) errors.reportError("memory allocation failed");
+        else d->bufferSize = (d->maxIslands + 1) * sizeof(TerriGroup);
     }
     // allocate point map
     if (d->extraBufferSize[ebMap] < d->totArea * sizeof(idType)) {
@@ -143,8 +145,8 @@ void regalityInitFunction(AltruData * d, int state) {
         // model version
         d->modelVersionMajor = 3;
         d->modelVersionMinor = 0;
-        d->modelDemeStructureSize = sizeof(TerriDeme);
-        d->modelPopOffset = demeFieldOffset(TerriDeme, nn); 
+        d->modelGroupStructureSize = sizeof(TerriGroup);
+        d->modelPopOffset = groupFieldOffset(TerriGroup, nn); 
         // enable and disable fields in parameters dialog boxes
         d->bGeographyParametersUsed = 0x510D1;
         d->bGroupPropertiesUsed = 0x300D0;
@@ -202,30 +204,30 @@ void regalityInitFunction(AltruData * d, int state) {
     }
 }
 
-// check deme data for consistency
-static void errorCheck(AltruData * d, TerriDeme * deme) {
+// check group data for consistency
+static void errorCheck(AltruData * d, TerriGroup * group) {
     char text[64];
-    if (deme->gAltruism[0] < 0 || deme->gAltruism[1] < 0
-        || deme->gAltruism[0] + deme->gAltruism[1] != deme->nn * 2
-        || (deme->gAltruism[0] + deme->gAltruism[1] & 1)) {
+    if (group->gAltruism[0] < 0 || group->gAltruism[1] < 0
+        || group->gAltruism[0] + group->gAltruism[1] != group->nn * 2
+        || (group->gAltruism[0] + group->gAltruism[1] & 1)) {
         sprintf_s(text, "error n %i, gAltru %i %i",
-            deme->nn, deme->gAltruism[0], deme->gAltruism[1]);
+            group->nn, group->gAltruism[0], group->gAltruism[1]);
         errors.reportError(text);
     }
-    if (deme->nn > 0 && deme->area == 0) {
+    if (group->nn > 0 && group->area == 0) {
         errors.reportError("Population on zero area");
     }
 }
 
-// find an empty TerriDeme record
-static TerriDeme * findEmptyDeme(AltruData * d) {
+// find an empty TerriGroup record
+static TerriGroup * findEmptyGroup(AltruData * d) {
     for (int i = 1; i <= d->maxIslands; i++) {
-        TerriDeme * deme = (TerriDeme*)(d->demeData) + i;
-        if (deme->area == 0 && deme->nn == 0) {
-            deme->age = 0; 
-            deme->id = idType(i);
+        TerriGroup * group = (TerriGroup*)(d->groupData) + i;
+        if (group->area == 0 && group->nn == 0) {
+            group->age = 0; 
+            group->id = idType(i);
             if (i > d->nIslands) d->nIslands = i;          // update number of territories in use
-            return deme;
+            return group;
         }
     }
     return 0;  // not found
@@ -253,13 +255,13 @@ statistics
 ******************************************************************************/
 
 void regalityGenerationFunction(AltruData * d, int state) {
-    int32_t ideme;                                         // deme index
-    TerriDeme * deme;                                      // point to deme
+    int32_t iGroup;                                        // group index
+    TerriGroup * group;                                    // point to group
     int32_t genotypes1[6];                                 // [0-2]: wild type, heterozygote, regalists before selection, [3-5]; same, for leader
     int32_t genotypes2[6];                                 // same, after selection
     double fitness[6];                                     // [0-2]: fitness of each genotype, [3-5]; same, for leader
     double survivalRate[3] = {0};                          // survival rate for each genotype under independent viability selection only
-    TerriDeme * neighborDeme = 0;                          // pointer to neighbor deme
+    TerriGroup * neighborGroup = 0;                        // pointer to neighbor group
     idType * map = (idType *)(d->extraBuffer[ebMap]);      // map of owner of each point
     Habitat terrain(d);                                    // object for manipulating points and territories
     float fractionOfRegality;                              // fracton of regality phenotype individuals
@@ -276,8 +278,8 @@ void regalityGenerationFunction(AltruData * d, int state) {
         // initialize statistics variables
         statisticsInit0(d);
 
-        // reset deme array
-        memset(d->demeData, 0, (d->maxIslands + 1) * sizeof(TerriDeme));
+        // reset group array
+        memset(d->groupData, 0, (d->maxIslands + 1) * sizeof(TerriGroup));
 
         // make a fence around habitat 
         // (this makes the code simpler because we don't have to check if we go outside the limits of x and y)
@@ -290,13 +292,13 @@ void regalityGenerationFunction(AltruData * d, int state) {
         for (i = (d->numRows - 1) * d->rowLengthTerri; i <d->totArea; i++) map[i] = 0;
 
         // first make one big territory covering the whole habitat except the fence
-        deme = (TerriDeme*)(d->demeData) + 1;              // deme 0 used for fence, first deme is number 1
-        deme->area = (d->rowLengthTerri - 2) * (d->numRows - 2);
-        deme->sx = (d->rowLengthTerri-1)*deme->area/2;
-        deme->sy = (d->numRows-1)*deme->area/2;
-        deme->centerx = deme->sx / deme->area; 
-        deme->centery = deme->sy / deme->area; 
-        deme->id = 1;
+        group = (TerriGroup*)(d->groupData) + 1;              // group 0 used for fence, first group is number 1
+        group->area = (d->rowLengthTerri - 2) * (d->numRows - 2);
+        group->sx = (d->rowLengthTerri-1)*group->area/2;
+        group->sy = (d->numRows-1)*group->area/2;
+        group->centerx = group->sx / group->area; 
+        group->centery = group->sy / group->area; 
+        group->id = 1;
         d->nIslands = 1;
 
         // make territories by splitting the big territory into many small ones
@@ -307,16 +309,16 @@ void regalityGenerationFunction(AltruData * d, int state) {
             j = 0;
             int n = d->nIslands;
             for (k = 1; k <= n; k++) {
-                deme = (TerriDeme*)(d->demeData) + k;      // point to current deme
-                int h = deme->area / (2 * size1);
+                group = (TerriGroup*)(d->groupData) + k;      // point to current group
+                int h = group->area / (2 * size1);
                 if (h > 1) {
                     // split this territory
-                    TerriDeme * deme2 = findEmptyDeme(d);  // find empty record and update nIslands
-                    if (deme2 == 0) {
+                    TerriGroup * group2 = findEmptyGroup(d);  // find empty record and update nIslands
+                    if (group2 == 0) {
                         errors.reportError("Not enough vacant territory records");
                         j = 0;  break;
                     }
-                    terrain.splitArea(deme, deme2, h * size1);
+                    terrain.splitArea(group, group2, h * size1);
                     j++;
                 }
             }
@@ -324,15 +326,15 @@ void regalityGenerationFunction(AltruData * d, int state) {
 
         // put population into all territories
         for (k = 1; k <= d->nIslands; k++) {
-            deme = (TerriDeme*)(d->demeData) + k;          // point to current deme
-            int32_t nn = (int32_t)lround(deme->area * d->carryingCapacity[0]);
+            group = (TerriGroup*)(d->groupData) + k;          // point to current group
+            int32_t nn = (int32_t)lround(group->area * d->carryingCapacity[0]);
             if (nn < d->minGroupSize) nn = d->minGroupSize;
-            deme->nn = deme->nmax = nn;
-            deme->gAltruism[1] = d->ran->binomial(nn*2, d->fg0[locusRegality]);
-            deme->gAltruism[0] = nn*2 - deme->gAltruism[1];
-            deme->age = 0;
-            deme->emigrationPotential = 1;                 // emigrationPotential is unused
-            deme->groupfit = 0.f;                          // not calculated yet
+            group->nn = group->nmax = nn;
+            group->gAltruism[1] = d->ran->binomial(nn*2, d->fg0[locusRegality]);
+            group->gAltruism[0] = nn*2 - group->gAltruism[1];
+            group->age = 0;
+            group->emigrationPotential = 1;                 // emigrationPotential is unused
+            group->groupfit = 0.f;                          // not calculated yet
         }
         // start running
         d->runState = state_run;
@@ -340,7 +342,7 @@ void regalityGenerationFunction(AltruData * d, int state) {
 
     // initialize statistics counters
     d->migrantsTot = 0;
-    d->demesDied = 0;
+    d->groupsDied = 0;
     d->newColonies = 0;
     for (int i = 0; i < d->nLoci; i++) {
         d->mutations[i][0] = d->mutations[i][1] = 0;    
@@ -349,7 +351,7 @@ void regalityGenerationFunction(AltruData * d, int state) {
     // war gain standard deviation
     double warGainStdDev = d->warIntensity * d->territorySizeMax * 0.1;
 
-    // shuffle demes in random order
+    // shuffle groups in random order
     int32_t * const orderList = (int32_t*)d->extraBuffer[ebOrder];      // list in random order
     d->ran->shuffle(orderList, 1, d->nIslands);                         // make list in random order. exclude number 0
 
@@ -363,8 +365,8 @@ void regalityGenerationFunction(AltruData * d, int state) {
 
 
     /**************************************************************************
-    *                       First deme loop:                                  *
-    *  select demes in random order
+    *                       First group loop:                                  *
+    *  select groups in random order
     *  mutation
     *  find neighbors
     *  immigration from neighbors
@@ -376,16 +378,16 @@ void regalityGenerationFunction(AltruData * d, int state) {
     *  territorial war
     **************************************************************************/
     for (int32_t ter = 0; ter < d->nIslands; ter++) {
-        // loop through demes in random order 
-        ideme = orderList[ter];                            // random order
-        deme = (TerriDeme*)(d->demeData) + ideme;          // point to current deme
-        if (deme->area == 0) continue;                     // skip unused records
+        // loop through groups in random order 
+        iGroup = orderList[ter];                            // random order
+        group = (TerriGroup*)(d->groupData) + iGroup;          // point to current group
+        if (group->area == 0) continue;                     // skip unused records
 
         // mutation
-        int32_t forwardMutations  = d->ran->binomial(deme->gAltruism[0], d->murate[locusRegality][0]);
-        int32_t backwardMutations = d->ran->binomial(deme->gAltruism[1], d->murate[locusRegality][1]);
-        deme->gAltruism[1] += forwardMutations - backwardMutations;
-        deme->gAltruism[0] -= forwardMutations - backwardMutations;
+        int32_t forwardMutations  = d->ran->binomial(group->gAltruism[0], d->murate[locusRegality][0]);
+        int32_t backwardMutations = d->ran->binomial(group->gAltruism[1], d->murate[locusRegality][1]);
+        group->gAltruism[1] += forwardMutations - backwardMutations;
+        group->gAltruism[0] -= forwardMutations - backwardMutations;
         d->mutations[locusRegality][0] += forwardMutations;
         d->mutations[locusRegality][1] += backwardMutations;
 
@@ -398,7 +400,7 @@ void regalityGenerationFunction(AltruData * d, int state) {
         // The consequence is that a group may sometimes fail to fight war against an enclave
         // even if it would be able to conquer it completely.
         // If you want to fix this problem, you may identify territories with only one neighbor as enclaves.
-        terrain.findNeighbors(deme, neighborlist, &numNeighbors);
+        terrain.findNeighbors(group, neighborlist, &numNeighbors);
         // calculate total border length
         int32_t perimeter = 0;
         for (int i = 0; i < numNeighbors; i++) {
@@ -416,10 +418,10 @@ void regalityGenerationFunction(AltruData * d, int state) {
                 if (s > n) break;
             }
         }
-        TerriDeme globalGenePool;                          // used in case immigrationCommonPool
-        TerriDeme * neighborDeme;                          // neighbor where immigrants come from
+        TerriGroup globalGenePool;                         // used in case immigrationCommonPool
+        TerriGroup * neighborGroup;                        // neighbor where immigrants come from
         float expectedMigrants = 0.f;                      // expected number of migrants before randomization
-        float stdGroupPopulation = d->territorySizeMax * d->carryingCapacity[locusAltruism]; // population of a big group = d->nMaxPerDeme
+        float stdGroupPopulation = d->territorySizeMax * d->carryingCapacity[locusAltruism]; // population of a big group = d->nMaxPerGroup
         int numMigrants = 0;                               // number of immigrants
 
         // loop for all neighbors
@@ -428,9 +430,9 @@ void regalityGenerationFunction(AltruData * d, int state) {
 
             // select one or all neighbors
             if (d->immigrationPattern != immigrationAllNeighbors && iNeighbor != sNeighbor) continue;
-            neighborDeme = (TerriDeme*)(d->demeData) + neighborlist[iNeighbor].id;
+            neighborGroup = (TerriGroup*)(d->groupData) + neighborlist[iNeighbor].id;
 
-            if (neighborDeme->nn > 0) {
+            if (neighborGroup->nn > 0) {
                 // select immigration pattern
                 switch (d->immigrationPattern) {
                 case immigrationCommonPool:                // immigration from global gene pool
@@ -438,61 +440,61 @@ void regalityGenerationFunction(AltruData * d, int state) {
                     globalGenePool.nn = d->totalPopulation;
                     globalGenePool.gAltruism[0] = d->genePool[locusRegality][0];
                     globalGenePool.gAltruism[1] = d->genePool[locusRegality][1];
-                    globalGenePool.emigrationPotential = d->nMaxPerDeme;
-                    neighborDeme = &globalGenePool;
-                    expectedMigrants = d->migrationRate[0] * deme->nmax;
+                    globalGenePool.emigrationPotential = d->nMaxPerGroup;
+                    neighborGroup = &globalGenePool;
+                    expectedMigrants = d->migrationRate[0] * group->nmax;
                     break;
                 case immigrationNeighbor:                  // immigration from one random neighbor
-                    expectedMigrants = d->migrationRate[0] * deme->nmax
-                        //* neighborDeme->nn / stdGroupPopulation;
-                        * neighborDeme->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * group->nmax
+                        //* neighborGroup->nn / stdGroupPopulation;
+                        * neighborGroup->emigrationPotential / stdGroupPopulation;
                     break;
                 case immigrationAllNeighbors:              // immigration from all neighbors, proportional to shared border
-                    expectedMigrants = d->migrationRate[0] * deme->nmax
-                        * neighborDeme->emigrationPotential 
+                    expectedMigrants = d->migrationRate[0] * group->nmax
+                        * neighborGroup->emigrationPotential 
                         * neighborlist[iNeighbor].sharedBorder / (stdGroupPopulation * perimeter);
                     break;
-                case immigrationProportional:              // immigration from one random neighbor, proportional to population of target deme
-                    expectedMigrants = d->migrationRate[0] * deme->nn
-                        * neighborDeme->emigrationPotential / stdGroupPopulation;
+                case immigrationProportional:              // immigration from one random neighbor, proportional to population of target group
+                    expectedMigrants = d->migrationRate[0] * group->nn
+                        * neighborGroup->emigrationPotential / stdGroupPopulation;
                     break;
                 case immigrationVacant:                    // immigration from one random neighbor, proportional to vacant area
-                    expectedMigrants = d->migrationRate[0] * (deme->nmax - deme->nn)
-                        * neighborDeme->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * (group->nmax - group->nn)
+                        * neighborGroup->emigrationPotential / stdGroupPopulation;
                     if (expectedMigrants < 0) expectedMigrants = 0;
                     break;
                 case immigrationRandomGroup:               // immigration from a random group
                     {
                     int migrantSource = d->ran->iRandom(1, d->nIslands - 1);
-                    if (migrantSource >= ideme) migrantSource++;     // avoid migration from same deme
-                    neighborDeme = (TerriDeme*)(d->demeData) + migrantSource; 
-                    expectedMigrants = d->migrationRate[0] * deme->nmax
-                        * neighborDeme->emigrationPotential / stdGroupPopulation;
+                    if (migrantSource >= iGroup) migrantSource++;     // avoid migration from same group
+                    neighborGroup = (TerriGroup*)(d->groupData) + migrantSource; 
+                    expectedMigrants = d->migrationRate[0] * group->nmax
+                        * neighborGroup->emigrationPotential / stdGroupPopulation;
                     }
                 }
                 numMigrants = d->ran->poisson(expectedMigrants);     // make number of migrants random
-                if (numMigrants > neighborDeme->nn) numMigrants = neighborDeme->nn; // cannot migrate more than there are
+                if (numMigrants > neighborGroup->nn) numMigrants = neighborGroup->nn; // cannot migrate more than there are
                 // select migrant genes
-                int32_t gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborDeme->gAltruism[0], neighborDeme->nn * 2);
+                int32_t gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborGroup->gAltruism[0], neighborGroup->nn * 2);
                 int32_t gmig1 = numMigrants * 2 - gmig0;
-                deme->gAltruism[0] += gmig0;               // add migrant genes to current deme
-                deme->gAltruism[1] += gmig1;
-                deme->nn += numMigrants;
-                neighborDeme->gAltruism[0] -= gmig0;       // subtract migrant genes from neighbor deme
-                neighborDeme->gAltruism[1] -= gmig1;
-                neighborDeme->nn -= numMigrants;
+                group->gAltruism[0] += gmig0;               // add migrant genes to current group
+                group->gAltruism[1] += gmig1;
+                group->nn += numMigrants;
+                neighborGroup->gAltruism[0] -= gmig0;       // subtract migrant genes from neighbor group
+                neighborGroup->gAltruism[1] -= gmig1;
+                neighborGroup->nn -= numMigrants;
                 d->migrantsTot += numMigrants;             // count total number of migrants
             }
         }
 
         // split into genotypes
-        combineGenes(deme->gAltruism, genotypes1, d->ran);
+        combineGenes(group->gAltruism, genotypes1, d->ran);
 
         // select a leader
         for (int i = 3; i < 6; i++) genotypes1[i] = 0; // reser leader genotypes
         if (d->leaderSelection < 0.f) d->leaderSelection = 0.f;
         bool hasLeader = true;                                       // true if there is a leader
-        if (deme->nn == 0) {                                         // deme is empty
+        if (group->nn == 0) {                                         // group is empty
             hasLeader = false;
         }
         else if (d->leaderSelection > 0.99E6f) {                     // leader must have regality
@@ -508,7 +510,7 @@ void regalityGenerationFunction(AltruData * d, int state) {
         if (hasLeader) {
             if (d->leaderSelection == 1.f) {
                 // unbiased leader selection among available genotypes
-                int32_t n = d->ran->iRandom(0, deme->nn - 1); // pick a random individual among all individuals
+                int32_t n = d->ran->iRandom(0, group->nn - 1); // pick a random individual among all individuals
                 int32_t s = 0;
                 for (int i = 0; i < 3; i++) {
                     s += genotypes1[i];
@@ -560,31 +562,31 @@ void regalityGenerationFunction(AltruData * d, int state) {
         if (!leaderRegalityCounts && hasLeader) regalPhenotypes++; // leader always supports himself
 
         fractionOfRegality = 0.f;
-        if (deme->nn > 0) {  // avoid division by 0          
-            fractionOfRegality = regalPhenotypes / float(deme->nn);
+        if (group->nn > 0) {  // avoid division by 0          
+            fractionOfRegality = regalPhenotypes / float(group->nn);
         }
 
         // calculate group fitness from fraction of regality and group fitness exponent
         switch (d->fitfunc) {
         case 0:              // one regalist is enough
-            if (regalPhenotypes > 0.f) deme->groupfit = 1.f;
-            else deme->groupfit = 0.f;
+            if (regalPhenotypes > 0.f) group->groupfit = 1.f;
+            else group->groupfit = 0.f;
             break;
         case 1: case 3:      // convex/concave
-            deme->groupfit = powf(fractionOfRegality, d->fitExpo);
+            group->groupfit = powf(fractionOfRegality, d->groupFitCurvature);
             break;
         case 2:  default:    // linear
-            deme->groupfit = fractionOfRegality;
+            group->groupfit = fractionOfRegality;
             break;
         case 4:              // all or nothing
-            if (regalPhenotypes == deme->nn) deme->groupfit = 1.f;
-            else deme->groupfit = 0.f;
+            if (regalPhenotypes == group->nn) group->groupfit = 1.f;
+            else group->groupfit = 0.f;
             break;
         }
 
         // calculate relative fitness for each phenotype
-        fitness[0] = d->fit[0] * (1.f - deme->groupfit) + d->fit[1] * deme->groupfit; // fitness of neutral
-        fitness[2] = d->fit[2] * (1.f - deme->groupfit) + d->fit[3] * deme->groupfit; // fitness of regality
+        fitness[0] = d->fit[0] * (1.f - group->groupfit) + d->fit[1] * group->groupfit; // fitness of neutral
+        fitness[2] = d->fit[2] * (1.f - group->groupfit) + d->fit[3] * group->groupfit; // fitness of regality
         switch (d->dominance[locusRegality]) {   // find fitness of heterozygotes
         case recessive:                // regalism recessive
             fitness[1] = fitness[0];
@@ -602,10 +604,10 @@ void regalityGenerationFunction(AltruData * d, int state) {
                 double fi = 1.f + d->leaderAdvantage * fractionOfRegality; // fitness factor of leader
                 double fn = 1.;                                            // fitness factor of non-leaders
                 if (fi < 0.) fi = 0.;
-                if (deme->nn > 1) {        // avoid division by 0                
-                    fn = (deme->nn - fi) / (deme->nn - 1.);
+                if (group->nn > 1) {        // avoid division by 0                
+                    fn = (group->nn - fi) / (group->nn - 1.);
                     if (fn < 0.) {
-                        fn = 0.;  fi = deme->nn;
+                        fn = 0.;  fi = group->nn;
                     }
                 }
                 else {
@@ -624,17 +626,17 @@ void regalityGenerationFunction(AltruData * d, int state) {
         // emigration
         switch(d->emigrationPattern) {
         case emigrationConstant:                           // emigration independent of population
-            deme->emigrationPotential = (d->nMaxPerDeme + d->minGroupSize) / 2;
+            group->emigrationPotential = (d->nMaxPerGroup + d->minGroupSize) / 2;
             break;
         case emigrationProportional:                       // emigration proportional to population
-            deme->emigrationPotential = deme->nn;
+            group->emigrationPotential = group->nn;
             break;
         case emigrationExcess:                             // emigration proportional to excess population
-            deme->emigrationPotential = (int32_t)lround(deme->nn * d->growthRate - deme->nmax);
-            if (deme->emigrationPotential < 1) deme->emigrationPotential = 1;
+            group->emigrationPotential = (int32_t)lround(group->nn * d->growthRate - group->nmax);
+            if (group->emigrationPotential < 1) group->emigrationPotential = 1;
             break;
         case emigrationGroupfit:                           // emigration proportional to group fitness * population
-            deme->emigrationPotential = deme->nn * deme->groupfit;
+            group->emigrationPotential = group->nn * group->groupfit;
             break;
         }
 
@@ -648,11 +650,11 @@ void regalityGenerationFunction(AltruData * d, int state) {
                 populationSize += genotypes2[i];
                 genotypes2[i+3] = 0;  // non-leaders and leader genotypes joined in genotypes2[0-2]
             }
-            if (populationSize > deme->nmax) {
+            if (populationSize > group->nmax) {
                 if (d->emigrationPattern == emigrationExcess) {
-                    deme->emigrationPotential = populationSize - deme->nmax;
+                    group->emigrationPotential = populationSize - group->nmax;
                 }
-                populationSize = deme->nmax; // min(populationSize, nmax)
+                populationSize = group->nmax; // min(populationSize, nmax)
             }
             // reduce population to carrying capacity
             d->ran->multiHypergeometric(genotypes2, genotypes2, populationSize, 3);
@@ -663,7 +665,7 @@ void regalityGenerationFunction(AltruData * d, int state) {
                 // equal growth of all genotypes before selection
                 populationSize += genotypes1[i] = d->ran->poisson(genotypes1[i] * d->growthRate);
             }
-            if (populationSize > deme->nmax) populationSize = deme->nmax; // min(populationSize, nmax)
+            if (populationSize > group->nmax) populationSize = group->nmax; // min(populationSize, nmax)
 
             // selection according to selection model
             switch (d->selectionModel) {
@@ -702,9 +704,9 @@ void regalityGenerationFunction(AltruData * d, int state) {
         int32_t g1 = genotypes2[1]*2 - g0;
 
         // sum gene pool
-        deme->nn = nn;
-        deme->gAltruism[0] = genotypes2[0]*2 + g0;
-        deme->gAltruism[1] = genotypes2[2]*2 + g1;
+        group->nn = nn;
+        group->gAltruism[0] = genotypes2[0]*2 + g0;
+        group->gAltruism[1] = genotypes2[2]*2 + g1;
 
 
         // the rest of this loop is only relevant for war
@@ -722,25 +724,25 @@ void regalityGenerationFunction(AltruData * d, int state) {
             regalPhenotypes += (genotypes2[1] + genotypes2[4]) * 0.5f;
         }
         fractionOfRegality = 0.f;
-        if (deme->nn) {                // avoid division by 0          
-            fractionOfRegality = regalPhenotypes / float(deme->nn);
+        if (group->nn) {                // avoid division by 0          
+            fractionOfRegality = regalPhenotypes / float(group->nn);
         }
 
         // re-calculate group fitness from fraction of regalists and group fitness exponent
         switch (d->fitfunc) {
         case 0:                        // one regalist is enough
-            if (regalPhenotypes > 0.f) deme->groupfit = 1.f;
-            else deme->groupfit = 0.f;
+            if (regalPhenotypes > 0.f) group->groupfit = 1.f;
+            else group->groupfit = 0.f;
             break;
         case 1: case 3:                // convex/concave
-            deme->groupfit = powf(fractionOfRegality, d->fitExpo);
+            group->groupfit = powf(fractionOfRegality, d->groupFitCurvature);
             break;
         case 2:  default:              // linear
-            deme->groupfit = fractionOfRegality;
+            group->groupfit = fractionOfRegality;
             break;
         case 4:                        // all or nothing
-            if (regalPhenotypes == deme->nn) deme->groupfit = 1.f;
-            else deme->groupfit = 0.f;
+            if (regalPhenotypes == group->nn) group->groupfit = 1.f;
+            else group->groupfit = 0.f;
             break;
         }
 
@@ -762,17 +764,17 @@ void regalityGenerationFunction(AltruData * d, int state) {
             float strength, strength1, sumStrength = 0.f;
             int i;
             for (i = 0; i < numNeighbors; i++) {           // calculate strength of all neighbors
-                neighborDeme = (TerriDeme*)(d->demeData) + neighborlist[i].id;
-                strength = neighborDeme->groupfit * neighborDeme->nn;
+                neighborGroup = (TerriGroup*)(d->groupData) + neighborlist[i].id;
+                strength = neighborGroup->groupfit * neighborGroup->nn;
                 if (strength > 0.f) sumStrength += 1.f / strength;
             }
             strength1 = d->ran->randomf() * sumStrength;   // random point in sum of strengths
             sumStrength = 0.f;
             for (i = 0; i < numNeighbors; i++) {
-                neighborDeme = (TerriDeme*)(d->demeData) + neighborlist[i].id;
-                strength = neighborDeme->groupfit * neighborDeme->nn;
+                neighborGroup = (TerriGroup*)(d->groupData) + neighborlist[i].id;
+                strength = neighborGroup->groupfit * neighborGroup->nn;
                 if (strength > 0.f) sumStrength += 1.f / strength;
-                else if (neighborDeme->area > 0) break;    // neighbor with zero strength and nonzero area
+                else if (neighborGroup->area > 0) break;    // neighbor with zero strength and nonzero area
                 if (sumStrength >= strength1) break;
             }
             sNeighbor = i;
@@ -784,11 +786,11 @@ void regalityGenerationFunction(AltruData * d, int state) {
 
             // select one or all neighbors
             if (d->warPattern != warAgainstAll && iNeighbor != sNeighbor) continue;
-            neighborDeme = (TerriDeme*)(d->demeData) + neighborlist[iNeighbor].id;
+            neighborGroup = (TerriGroup*)(d->groupData) + neighborlist[iNeighbor].id;
 
             // attack this neighbor. expected gain is warIntensity * (difference in strength)
             float expectedGain = d->warIntensity * d->territorySizeMax *
-                (deme->groupfit * deme->nn - neighborDeme->groupfit * neighborDeme->nn) / d->nMaxPerDeme;
+                (group->groupfit * group->nn - neighborGroup->groupfit * neighborGroup->nn) / d->nMaxPerGroup;
             if (expectedGain > 0.f) {
                 float gain = d->ran->normal(expectedGain, warGainStdDev);
                 int transferArea = (int)lround(gain);
@@ -796,41 +798,41 @@ void regalityGenerationFunction(AltruData * d, int state) {
                 if (transferArea > 0) {  // ignore negative gains
                     // note: if this code is modified so that transferArea can be negative (i.e. we can lose 
                     // territory to neighbor) and warPattern == warAgainstAll, then we have to 
-                    // check here if neighborDeme is still a neighbor to deme (use isNeighbor function)
+                    // check here if neighborGroup is still a neighbor to group (use isNeighbor function)
 
-                    int32_t neighborAreaBefore = neighborDeme->area;
+                    int32_t neighborAreaBefore = neighborGroup->area;
 
-                    // take land from neighborDeme
-                    terrain.conquer(neighborDeme, deme, transferArea, neighborlist + iNeighbor);
+                    // take land from neighborGroup
+                    terrain.conquer(neighborGroup, group, transferArea, neighborlist + iNeighbor);
 
                     // transfer survivors from loser to winner
-                    transferArea = neighborAreaBefore - neighborDeme->area; // may occasionally transfer more than expected
+                    transferArea = neighborAreaBefore - neighborGroup->area; // may occasionally transfer more than expected
                     // expected number of migrating survivors is proportional to the lost area
                     float meanSurvivors = d->surviv * transferArea / neighborAreaBefore;
                     if (meanSurvivors > 1.f) meanSurvivors = 1.f;  // can happen if surviv > 1
-                    int32_t survivors = d->ran->binomial(neighborDeme->nn, meanSurvivors);
+                    int32_t survivors = d->ran->binomial(neighborGroup->nn, meanSurvivors);
                     if (survivors > 0) {
                         // genes of survivors
-                        int32_t tg0 = d->ran->hypergeometric(survivors * 2, neighborDeme->gAltruism[0], neighborDeme->nn * 2);
+                        int32_t tg0 = d->ran->hypergeometric(survivors * 2, neighborGroup->gAltruism[0], neighborGroup->nn * 2);
                         int32_t tg1 = survivors * 2 - tg0;
-                        deme->gAltruism[0] += tg0;             // add survivor genes to current deme
-                        deme->gAltruism[1] += tg1;
-                        deme->nn += survivors;
-                        neighborDeme->gAltruism[0] -= tg0;     // subtract survivor genes from neighbor deme
-                        neighborDeme->gAltruism[1] -= tg1;
-                        neighborDeme->nn -= survivors;
+                        group->gAltruism[0] += tg0;             // add survivor genes to current group
+                        group->gAltruism[1] += tg1;
+                        group->nn += survivors;
+                        neighborGroup->gAltruism[0] -= tg0;     // subtract survivor genes from neighbor group
+                        neighborGroup->gAltruism[1] -= tg1;
+                        neighborGroup->nn -= survivors;
                         d->migrantsTot += survivors;           // count total number of migrants
                         // transfer emigration potential
-                        int32_t emiPot = neighborDeme->emigrationPotential * transferArea / neighborAreaBefore;
-                        deme->emigrationPotential += emiPot;
-                        neighborDeme->emigrationPotential -= emiPot;
+                        int32_t emiPot = neighborGroup->emigrationPotential * transferArea / neighborAreaBefore;
+                        group->emigrationPotential += emiPot;
+                        neighborGroup->emigrationPotential -= emiPot;
                     }
-                    if (neighborDeme->area == 0) {
+                    if (neighborGroup->area == 0) {
                         // total loss
-                        d->demesDied++;
-                        neighborDeme->nn = 0;
-                        neighborDeme->gAltruism[0] = 0;
-                        neighborDeme->gAltruism[1] = 0;
+                        d->groupsDied++;
+                        neighborGroup->nn = 0;
+                        neighborGroup->gAltruism[0] = 0;
+                        neighborGroup->gAltruism[1] = 0;
                     }
                 }
             }
@@ -838,52 +840,52 @@ void regalityGenerationFunction(AltruData * d, int state) {
     }
 
     /**************************************************************************
-    *              second deme loop: split big groups                         *
+    *              second group loop: split big groups                         *
     **************************************************************************/
-    // loop through demes in linear order 
-    for (ideme = 1; ideme <= d->nIslands; ideme++) {
-        deme = (TerriDeme*)(d->demeData) + ideme;          // point to current deme
-        if (deme->area == 0) continue;                     // skip unused record
+    // loop through groups in linear order 
+    for (iGroup = 1; iGroup <= d->nIslands; iGroup++) {
+        group = (TerriGroup*)(d->groupData) + iGroup;          // point to current group
+        if (group->area == 0) continue;                     // skip unused record
 
-        // split demes with large area in two
-        if (deme->area > d->territorySizeMax && deme->nn > 4) {
+        // split groups with large area in two
+        if (group->area > d->territorySizeMax && group->nn > 4) {
             int e;
-            // find a vacant deme record
-            neighborDeme = findEmptyDeme(d);               // find empty record and update nIslands
-            if (neighborDeme == 0) {
+            // find a vacant group record
+            neighborGroup = findEmptyGroup(d);               // find empty record and update nIslands
+            if (neighborGroup == 0) {
                 errors.reportError("Not enough vacant territory records");
                 break;
             }
-            terrain.splitArea(deme, neighborDeme, deme->area / 2);
+            terrain.splitArea(group, neighborGroup, group->area / 2);
             d->newColonies++;
-            neighborDeme->age = 0;
+            neighborGroup->age = 0;
 
             // transfer half of population to new area
-            if (deme->nn > 1) {
-                double mean = deme->nn * 0.5;
+            if (group->nn > 1) {
+                double mean = group->nn * 0.5;
                 double limit1 = d->minGroupSize * 0.5;  if (limit1 >= mean) limit1 = 0.;
-                double limit2 = deme->nn - limit1;  if (limit2 <= mean) limit2 = deme->nn;
-                int32_t colonists = d->ran->normalTrunc(mean, deme->nn * 0.1, limit1, limit2);
+                double limit2 = group->nn - limit1;  if (limit2 <= mean) limit2 = group->nn;
+                int32_t colonists = d->ran->normalTrunc(mean, group->nn * 0.1, limit1, limit2);
                 // transfer half of gene pool
-                int32_t tg0 = d->ran->hypergeometric(colonists * 2, deme->gAltruism[0], deme->nn * 2);
+                int32_t tg0 = d->ran->hypergeometric(colonists * 2, group->gAltruism[0], group->nn * 2);
                 int32_t tg1 = colonists * 2 - tg0;
-                neighborDeme->gAltruism[0] = tg0;          // add survivor genes to current deme
-                neighborDeme->gAltruism[1] = tg1;
-                neighborDeme->nn = colonists;
-                deme->gAltruism[0] -= tg0;                 // subtract survivor genes from neighbor deme
-                deme->gAltruism[1] -= tg1;
-                deme->nn -= colonists;
+                neighborGroup->gAltruism[0] = tg0;          // add survivor genes to current group
+                neighborGroup->gAltruism[1] = tg1;
+                neighborGroup->nn = colonists;
+                group->gAltruism[0] -= tg0;                 // subtract survivor genes from neighbor group
+                group->gAltruism[1] -= tg1;
+                group->nn -= colonists;
             }
             // copy fitness. This approximate group fitness is only for display and statistics.
             // An accurate value will be calculated in next generation
-            neighborDeme->groupfit = deme->groupfit;
+            neighborGroup->groupfit = group->groupfit;
             // transfer half of emigration potential
-            deme->emigrationPotential = neighborDeme->emigrationPotential = deme->emigrationPotential / 2u;
+            group->emigrationPotential = neighborGroup->emigrationPotential = group->emigrationPotential / 2u;
         }
     }
 
     /**************************************************************************
-    *                 third deme loop: statistics                             *
+    *                 third group loop: statistics                             *
     **************************************************************************/
 
     // reset statistics counters before each generation
@@ -891,33 +893,31 @@ void regalityGenerationFunction(AltruData * d, int state) {
         d->totalPhenotypes[i] = 0;
         d->genePool[i][0] = d->genePool[i][1] = 0;
     }
-    d->inhabitedDemes = 0;
+    d->inhabitedGroups = 0;
     d->totalPopulation = 0;
-    d->altruistDemes = 0;
-    //d->egoistDemes = 0;
+    d->altruistGroups = 0;
     d->stopCause = stopCauseNone;
 
-    // loop through demes in linear order 
-    for (ideme = 1; ideme <= d->nIslands; ideme++) {
-        deme = (TerriDeme*)(d->demeData) + ideme;          // point to current deme
-        if (deme->area == 0) continue;                     // skip unused record
-        if (deme->nn == 0) continue;                       // skip empty territory
-        deme->age++;  if (deme->age <= 0) deme->age--;     // avoid overflow
-        //if (deme->nn == 0) emptyTerritories++;
-        else d->inhabitedDemes++;
-        d->totalPopulation += deme->nn;
-        d->genePool[locusRegality][0] += deme->gAltruism[0];
-        d->genePool[locusRegality][1] += deme->gAltruism[1];
-        d->totalPhenotypes[locusRegality] += int(deme->groupfit * deme->nn);
-        if (deme->gAltruism[1] > deme->gAltruism[0]) d->altruistDemes++;
-        //else d->egoistDemes++;
-
-        errorCheck(d, deme); // temporary error check. May be removed
+    // loop through groups in linear order 
+    for (iGroup = 1; iGroup <= d->nIslands; iGroup++) {
+        group = (TerriGroup*)(d->groupData) + iGroup;          // point to current group
+        if (group->area == 0) continue;                     // skip unused record
+        if (group->nn == 0) continue;                       // skip empty territory
+        group->age++;  if (group->age <= 0) group->age--;     // avoid overflow
+        //if (group->nn == 0) emptyTerritories++;
+        else d->inhabitedGroups++;
+        d->totalPopulation += group->nn;
+        d->genePool[locusRegality][0] += group->gAltruism[0];
+        d->genePool[locusRegality][1] += group->gAltruism[1];
+        d->totalPhenotypes[locusRegality] += int(group->groupfit * group->nn);
+        if (group->gAltruism[1] > group->gAltruism[0]) d->altruistGroups++;
+        
+        errorCheck(d, group); // temporary error check. May be removed
     }
     // update statistics counters
     d->generations++;  // count generations
     d->sumMutations += d->mutations[locusRegality][0] + d->mutations[locusRegality][1];
-    d->sumExtinctions += d->demesDied;
+    d->sumExtinctions += d->groupsDied;
     d->sumMigrants += d->migrantsTot;
 
     // check if finished

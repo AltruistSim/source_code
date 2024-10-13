@@ -1,14 +1,14 @@
 /***********************  parameter_file_io.cpp   *****************************
 * Author:        Agner Fog
 * Date created:  2023-04-15
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the procedures and lists for reading and writing 
 * parameter files.
 *
-* (c) Copyright 20232024 Agner Fog.
+* (c) Copyright 2024 Agner Fog.
 * GNU General Public License, version 3.0 or later
 ******************************************************************************/
 
@@ -31,7 +31,7 @@ ParameterDef const parameterDefinitions[] {
     {0, 1, 0, "Geography"},
     {1, 1, altruDataOffset(totArea), "totalArea"},
     {1, 1, altruDataOffset(maxIslands), "maxNumGroups"},
-    {1, 1, altruDataOffset(nMaxPerDeme), "maxPerGroup"},
+    {1, 1, altruDataOffset(nMaxPerGroup), "maxPerGroup"},
     {2, 2, altruDataOffset(carryingCapacity), "carryingCapacity"},
     {2, 1, altruDataOffset(carryingCapacityStandardDeviation), "carryingCapacityStandardDeviation"},
     {1, 1, altruDataOffset(territorySizeMax), "maxTerritoryArea"},
@@ -61,11 +61,11 @@ ParameterDef const parameterDefinitions[] {
     {0, 1, 0, "Group properties"},
     {2, 1, altruDataOffset(surviv), "survivalRate"},
     {2, 1, altruDataOffset(warIntensity), "warIntensity"},
-    {2, 4, altruDataOffset(extinctionRate), "demeExtinctionRates"},
+    {2, 4, altruDataOffset(extinctionRate), "groupExtinctionRates"},
     {1, 1, altruDataOffset(extinctionPattern), "extinctionPattern"},
     {1, 1, altruDataOffset(warPattern), "warPattern"},
     {1, 1, altruDataOffset(fitfunc), "groupFitnessFunction"},
-    {2, 1, altruDataOffset(fitExpo), "groupFitnessExponent"},
+    {2, 1, altruDataOffset(groupFitCurvature), "groupFitnessCurvature"},
     {2, 1, altruDataOffset(leaderAdvantage), "leaderAdvantage"},
     {2, 1, altruDataOffset(leaderSelection), "leaderSelection"},
     {1, 1, altruDataOffset(haystackPeriod), "haystackPeriod"},
@@ -220,6 +220,11 @@ void Altruist::writeParameterFile(QString filename) {
     int i;                             // loop counter
     int n;                             // character counter
     int8_t * field;                    // point to field in d
+
+    // write header
+    snprintf(text, textlen, "[Altruist version %i.%i parameter file]\n", altruistMajorVersion, altruistMinorVersion);
+    file.write(text);
+
     // loop through two parameter lists, the global and the model-specific list
     for (int parlist = 0; parlist < 2; parlist++) {
         if (parlist == 0) {
