@@ -1,8 +1,8 @@
 /****************************  altruist.h   ***********************************
 * Author:        Agner Fog
 * Date created:  1997-10-09
-* Last modified: 2024-06-25
-* Version:       3.001
+* Last modified: 2024-09-19
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines common data structures, classes, and functions
@@ -22,7 +22,7 @@
 
 // Altruist version number
 const int altruistMajorVersion = 3;
-const int altruistMinorVersion = 1;
+const int altruistMinorVersion = 2;
 
 // maximum number of gene loci
 const int maxLoci = 4;
@@ -169,7 +169,7 @@ const int numExtraBuffers = 5;         // number of buffers for extra model-spec
 ******************************************************************************/
 
 struct AltruData {
-    int8_t * demeData;                 // buffer for storing demes
+    int8_t * groupData;                // buffer for storing groups
     int64_t bufferSize;                // size of allocated data
     // Extra buffers can be used by model modules for allocating data structures for arbitrary use.
     // The pointers must be null when not allocated and non-zero when allocated.
@@ -184,14 +184,14 @@ struct AltruData {
     int32_t iModel;                    // model index
     int modelVersionMajor;             // model version
     int modelVersionMinor;             // model sub-version
-    int modelDemeStructureSize;        // size of model-specific deme structure
-    int modelPopOffset;                // offset to population count in model-specific deme structure
+    int modelGroupStructureSize;       // size of model-specific group structure
+    int modelPopOffset;                // offset to population count in model-specific group structure
 
     //**************** Parameters: Geography and migration *********************
     uint32_t bGeographyParametersUsed; // define which geography parameters are used:
     // 1: totArea
     // 2: maxIslands
-    // 4: nMaxPerDeme
+    // 4: nMaxPerGroup
     // 0x10: carryingCapacity under egoism
     // 0x20: carryingCapacity under altruism (if different)
     // 0x40: territorySizeMax
@@ -209,8 +209,8 @@ struct AltruData {
     // 0x100000: colonizationPattern
     // 0x200000: migrationTopology
 
-    int32_t maxIslands;                // maximum number of islands or demes
-    int32_t nMaxPerDeme;               // max number of individuals per deme
+    int32_t maxIslands;                // maximum number of islands or groups
+    int32_t nMaxPerGroup;               // max number of individuals per group
     int32_t totArea;                   // total area of habitat (floating territories)
     int32_t lastArea;                  // value of totArea when simulation started
     int32_t rowLength;                 // length of rows in organization of islands
@@ -218,8 +218,8 @@ struct AltruData {
     int32_t numRows;                   // number of rows in territorial map or island map
     float   carryingCapacity[2];       // carrying capacity per island or area unit under egoism/altruism
     float   carryingCapacityStandardDeviation; // standard deviation if carryingCapacity is random
-    int32_t territorySizeMax;          // max area of deme territory (floating territories)
-    int32_t territorySizeMin;          // min area of deme territory (floating territories)
+    int32_t territorySizeMax;          // max area of group territory (floating territories)
+    int32_t territorySizeMin;          // min area of group territory (floating territories)
     int32_t minGroupSize;              // minimum group size
     int32_t colonySize;                // recolonization group size
     float   migrationRate[2];          // interdemic migration coefficient, normal and under endogamy
@@ -312,15 +312,15 @@ struct AltruData {
                                        // 0x80: warIntensity
                                        // 0x100: haystackPeriod
                                        // 0x200: mixingPeriod
-                                       // 0x1000: fitExpo
+                                       // 0x1000: groupFitCurvature
                                        // 0x10000: leaderAdvantage
                                        // 0x20000: leaderSelection
 
-    float extinctionRate[4];           // extinction rates for demes (island model)
-                                       // extinctionRate[0] = small deme with egoists
-                                       // extinctionRate[1] = big   deme with egoists
-                                       // extinctionRate[2] = small deme with altruists
-                                       // extinctionRate[3] = big   deme with altruists
+    float extinctionRate[4];           // extinction rates for groups (island model)
+                                       // extinctionRate[0] = small group with egoists
+                                       // extinctionRate[1] = big   group with egoists
+                                       // extinctionRate[2] = small group with altruists
+                                       // extinctionRate[3] = big   group with altruists
 
     float surviv;                      // survival degree for extinct islands or for defeated group in war
     float warIntensity;                // intensity of territorial war
@@ -331,11 +331,11 @@ struct AltruData {
                                        // 1: one is enough, 
                                        // 2: convex(0.5), 4: linear, 8: concave(2.0), 
                                        // 0x10: all or nothing,
-                                       // 0x100: fitExpo can have any value
+                                       // 0x100: groupFitCurvature can have any value
 
-    float fitExpo;                     // group fitness exponent
+    float groupFitCurvature;                     // group fitness exponent
     int32_t fitfunc;                   // group fitness as function of altruists:
-                                       // fitfunc:      fitExpo:        group fitness function:
+                                       // fitfunc:      groupFitCurvature:        group fitness function:
                                        //    0              0           one altruist is enough
                                        //    1             0-1 (0.5)    convex
                                        //    2              1           linear
@@ -353,7 +353,7 @@ struct AltruData {
     };
 
     //**************** Parameters for Run control *********************
-    int32_t demeStructureSize;         // memory size per deme
+    int32_t groupStructureSize;        // memory size per group
     int32_t seed;                      // random number seed
     int32_t minimumGenerations;        // minimum number of generations
     int32_t maximumGenerations;        // maximum number of generations
@@ -372,7 +372,7 @@ struct AltruData {
     //******   statistics output from model generation function      ******
     int32_t nIslands;                  // number of islands or territories
     int32_t mutations[maxLoci][2];     // number of mutations in this generation
-    int32_t demesDied;                 // number of demes extinguished in this generation
+    int32_t groupsDied;                 // number of groups extinguished in this generation
     int32_t newColonies;               // number of new colonies formed by splitting or by colonizing vacant islands
     int32_t migrantsTot;               // total number of migrants in this generation
 
@@ -380,9 +380,8 @@ struct AltruData {
     int64_t genePool[maxLoci][2];      // global gene pool
     int64_t totalPopulation;           // total number of individuals
     int64_t totalPhenotypes[maxLoci*2];// total number of individuals of various fenotypes. Use of this array is model-specific
-    int32_t inhabitedDemes;            // number of inhabited islands
-    int32_t altruistDemes;             // number of demes with altruism
-    //int32_t egoistDemes;               // number of demes with egoism
+    int32_t inhabitedGroups;           // number of inhabited islands
+    int32_t altruistGroups;             // number of groups with altruism
     float   geneFraction[maxLoci];     // resulting gene fraction for mutant in each locus
     float   fAltru;                    // overall fraction of phenotypic altruists
 
@@ -424,7 +423,7 @@ struct AltruData {
                                        // 0x20: mutations
                                        // 0x40: migrants
                                        // 0x80:
-                                       // 0x100: altruism demes
+                                       // 0x100: altruism groups
                                        // 0x200: extinctions
                                        // 0x400: simulation result
                                        // 0x800: model-specific statistics
@@ -549,8 +548,8 @@ extern uint32_t const parameterDefinitionsSize;  // size of parameterDefinitions
 // This works like a member pointer for a data member of arbitrary type
 #define altruDataOffset(x) (int32_t((int8_t*)&((AltruData*)0)->x - (int8_t*)0))
 
-// Get offset of a data member of Deme structure or arbitrary structure. 
-#define demeFieldOffset(D,x) (int32_t((int8_t*)&((D*)0)->x - (int8_t*)0))
+// Get offset of a data member of Group structure or arbitrary structure. 
+#define groupFieldOffset(D,x) (int32_t((int8_t*)&((D*)0)->x - (int8_t*)0))
 
 
 
@@ -560,15 +559,15 @@ extern uint32_t const parameterDefinitionsSize;  // size of parameterDefinitions
 
 const int maxModels = 32; // maximum number of defined models
 
-// Descriptor of Deme structure.
-// A deme is a geographically limited territory containing a group of organisms.
-// An array of Deme data structures contains gene counts and group proporties for 
-// each Deme. The Deme data structure may be different for each simulation model.
-// The Deme field descriptor gives information about each field in this structure 
+// Descriptor of Group structure.
+// A group is a geographically limited territory containing a group of organisms.
+// An array of group data structures contains gene counts and group proporties for 
+// each group. The group data structure may be different for each simulation model.
+// The group field descriptor gives information about each field in this structure 
 // to the main program:
-struct DemeFieldDescriptor {
+struct GroupFieldDescriptor {
     int32_t type;            // 0: end of list, 
-                             // 1: size of Deme structure, 
+                             // 1: size of group structure, 
                              // 2: carrying capacity (max individuals)
                              // 3: population (number of individuals)
                              // 4: gene count, 
@@ -576,13 +575,13 @@ struct DemeFieldDescriptor {
                              // 8: group property
     int32_t varType;         // 1: 8-bit integer, 2: 16-bit integer, 3: 32-bit integer, 4: 64-bit integer
                              // 8: float, 9: double
-    int32_t offset;          // offset into Deme structure
+    int32_t offset;          // offset into group structure
     int32_t statistic;       // 1: calculate sum, 2: calculate mean
                              // 4: possible stop criterion, stop when above certain value
                              // 8: possible stop criterion, stop when below certain value
     int32_t graphics;        // show in graphics display:
                              // 2:  max size
-                             // 3:  population. divide by max size or nMaxPerDeme to get relative size
+                             // 3:  population. divide by max size or nMaxPerGroup to get relative size
                              // 4:  area. divide by territorySizeMax to get relative size
                              // 10: gene count for mutant, primary locus
                              // 11: gene count for mutant, secondary locus
@@ -600,7 +599,7 @@ struct ModelDescriptor {
     const char * name;                                     // name of model
     const char * description;                              // describing text
     const ParameterDef * extraParameters;                  // extra fields in parameters dialog box
-    const DemeFieldDescriptor * demeFields;                // list of fields in Deme structure
+    const GroupFieldDescriptor * groupFields;              // list of fields in group structure
     void (*initFunction)(AltruData * a, int state);        // initialization function pointer
     void (*generationFunction)(AltruData * a, int mode);   // generation function pointer
 };
@@ -681,8 +680,8 @@ void differentialGrowth(int32_t genePool[2], double growthRate[3], int32_t genot
 // growth and selection when number of offspring is known
 void growthAndSelection(int32_t genes[2], int32_t numChildren, int dominance, float relativeFitness, RandomVariates * ran);
 
-// find all neighbors to a deme, according to migration topology
-int findNeighbors(AltruData * d, int32_t deme, int32_t neighbors[]);
+// find all neighbors to a group, according to migration topology
+int findNeighbors(AltruData * d, int32_t group, int32_t neighbors[]);
 
 
 

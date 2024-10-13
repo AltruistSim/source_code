@@ -1,8 +1,8 @@
 /****************************  random.h   *********************************
 * Author:        Agner Fog
 * Date created:  2023-07-05
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines random number generators with uniform and 

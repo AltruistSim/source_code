@@ -1,8 +1,8 @@
 /*****************************  parameterloop.h   *****************************
 * Author:        Agner Fog
 * Date created:  1995-02-10
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines parameter loops that let you run multiple simulations

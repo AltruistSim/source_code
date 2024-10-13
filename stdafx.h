@@ -1,8 +1,8 @@
 /****************************  stdafx.h   *************************************
 * Author:        Agner Fog
 * Date created:  2023-03-30
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-08
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file includes all necessary header files. It also facilitates

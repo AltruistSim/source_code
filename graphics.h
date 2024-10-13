@@ -1,8 +1,8 @@
 /*******************************  graphics.h   ********************************
 * Author:        Agner Fog
 * Date created:  2023-08-07
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines graphic display of islands, territories, etc.
@@ -60,4 +60,4 @@ protected:
     void mouseHandlerLimitMap(int x, int y);     // handle mouse click on limits map graphic
 };
 
-void demeDescriptionMessageBox(int id, AltruData * d); // make a message box showing the contents of a deme record
+void groupDescriptionMessageBox(int id, AltruData * d); // make a message box showing the contents of a group record

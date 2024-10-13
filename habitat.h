@@ -1,8 +1,8 @@
 /****************************  habitat.h   ************************************
 * Author:        Agner Fog
 * Date created:  2023-09-10
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines common data structures, classes, and functions
@@ -26,14 +26,14 @@ typedef uint16_t idType;                         // 16 bits
 int const maxId = 0xFFFE;                        // maximum value of group id
 
 
-// Deme structure, describing each deme or territory
-struct TerriDeme {
+// Group structure, describing each group or territory
+struct TerriGroup {
     int32_t  nn;                                 // number of individuals in group
     int32_t  nmax;                               // carrying capacity
     int32_t  gAltruism[2];                       // gene pool, [0]: egoism or neutral; [1]: altruism or regality
     int32_t  area;                               // area of territory
     int32_t  emigrationPotential;                // excess available for emigration
-    idType   id;                                 // index into demeData, used as owner for points belong to this deme
+    idType   id;                                 // index into groupData, used as owner for points belong to this group
     idType   age;                                // group age
     uint32_t sx;                                 // sum of x coordinates
     uint32_t sy;                                 // sum of y coordinates
@@ -149,7 +149,7 @@ struct Neighbor {                                // used for results from functi
     int32_t sharedBorder;                        // length of shared border
     int32_t nonContiguous;                       // if border to this neighbor not contiguous
     TPoint  start;                               // first border point
-    idType  id;                                  // neighbor deme
+    idType  id;                                  // neighbor group
 };
 
 
@@ -170,26 +170,26 @@ public:
         map[p.x+p.y*rowLength] = newOwner;
     }
     // find a point on the border of a group territory
-    TPoint findBorder(TerriDeme const * d1) const;
+    TPoint findBorder(TerriGroup const * d1) const;
     // same as findBorder, tries to avoid border to an enclave:
-    TPoint findBorder2(TerriDeme const * d1) const;
+    TPoint findBorder2(TerriGroup const * d1) const;
     // find all neighbor territories with a shared border with territory d1
-    int findNeighbors(TerriDeme const * const d1, Neighbor * const neighborList, int * const numNeighbors) const;
+    int findNeighbors(TerriGroup const * const d1, Neighbor * const neighborList, int * const numNeighbors) const;
     // transfer na units of land from owner 'nfrom' to conqueror 'to'
-    void conquer(TerriDeme * from, TerriDeme * to, int32_t na, Neighbor const * nfrom) const;
+    void conquer(TerriGroup * from, TerriGroup * to, int32_t na, Neighbor const * nfrom) const;
     // change owner of all points of land contiguous with p        
-    void splitArea(TerriDeme * oldOwner, TerriDeme * newOwner, int32_t ar) const;
+    void splitArea(TerriGroup * oldOwner, TerriGroup * newOwner, int32_t ar) const;
     // check if two groups are neighbors
-    TPoint isNeighbor(TerriDeme const * d1, idType d2) const;
+    TPoint isNeighbor(TerriGroup const * d1, idType d2) const;
     // find central point belonging to a territory
-    TPoint findCenter(TerriDeme const * d1) const;
+    TPoint findCenter(TerriGroup const * d1) const;
     // check if territory is contiguous. This is used for debugging only
-    void checkIfContiguous(TerriDeme const * d1) const;
+    void checkIfContiguous(TerriGroup const * d1) const;
     
 protected:
     int32_t floodFill(TPoint const & p, idType newOwner) const;
     // update information in both territories after transfer of land
-    void updateTerr(TerriDeme * oldOwner, TerriDeme * newOwner, int32_t tarea, uint32_t sx, uint32_t sy, float popDens) const;
+    void updateTerr(TerriGroup * oldOwner, TerriGroup * newOwner, int32_t tarea, uint32_t sx, uint32_t sy, float popDens) const;
     AltruData * d;                               // pointer to common data structure
     idType * map;                                // pointer to map of point owners
     TPoint * buffer1;                            // memory allocated for list of points

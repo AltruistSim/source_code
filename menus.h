@@ -1,8 +1,8 @@
 /*******************************  menus.h   ***********************************
 * Author:        Agner Fog
 * Date created:  2023-08-08
-* Last modified: 2023-12-31
-* Version:       3.001
+* Last modified: 2024-10-13
+* Version:       3.002
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines menus and dialog boxes in the user interface
@@ -31,6 +31,7 @@ private:
     QGridLayout dialogLayout;
     QComboBox modelComboBox;
     QLabel modelLabel;
+    QLabel modelFileName;
     QPushButton okButton;
     QPushButton cancelButton;
     QPushButton descriptionButton;
@@ -44,19 +45,19 @@ private:
     QGridLayout dialogLayout;
     QLabel labelTotArea;               // total area of habitat (floating territories)
     QLineEdit editTotArea;
-    QLabel labelMaxIslands;            // maximum number of islands or demes
+    QLabel labelMaxIslands;            // maximum number of islands or groups
     QLineEdit editMaxIslands;
-    QLabel labelMaxPerDeme;            // max number of individuals per deme
-    QLineEdit editMaxPerDeme;
+    QLabel labelMaxPerGroup;           // max number of individuals per group
+    QLineEdit editMaxPerGroup;
 
     QLabel labelPopulationDensity0;    // carrying capacity per area unit under egoism
     QLineEdit editPopulationDensity0;
     QLabel labelPopulationDensity1;    // carrying capacity per area unit under altruism
     QLineEdit editPopulationDensity1;
 
-    QLabel labelTerritorySizeMax;      // max area of deme territory (floating territories)
+    QLabel labelTerritorySizeMax;      // max area of group territory (floating territories)
     QLineEdit editTerritorySizeMax;
-    QLabel labelTerritorySizeMin;      // min area of deme territory (floating territories)
+    QLabel labelTerritorySizeMin;      // min area of group territory (floating territories)
     QLineEdit editTerritorySizeMin;
     QLabel labelCapacityStdDev;        //  minimum group size
     QLineEdit editCapacityStdDev;
@@ -137,7 +138,7 @@ private:
     QLabel labelDependGroupSuccessOn;
     QLabel labelGroupFitnessFactor[6];
     QLabel labelGroupFitnessFunction;
-    QLabel labelGroupFitnessExponent;
+    QLabel labelGroupFitnessCurvature;
 
     QLineEdit editIndividualFitness[8];     // edit field for individual fitness
     QLineEdit editIndividualFitness2[4];    // edit field for individual fitness at extra loci
@@ -156,7 +157,7 @@ private:
     QLineEdit editExtinctionRates[4];
     QLineEdit editGroupFitnessFactors[6];
     QComboBox comboGroupFitnessFunction;
-    QLineEdit editGroupFitnessExponent;
+    QLineEdit editGroupFitnessCurvature;
 
     QPushButton okButton;
     QPushButton cancelButton;
@@ -229,7 +230,7 @@ private:
     QLabel labelAltruists;
     QLabel labelMutations;
     QLabel labelMigrants;
-    QLabel labelAltruismDemes;
+    QLabel labelAltruismGroups;
     QLabel labelExtinctions;
     QLabel labelResult;
     QLabel labelModelSpecific;
@@ -249,7 +250,7 @@ private:
     QCheckBox checkboxAltruists;
     QCheckBox checkboxMutations;
     QCheckBox checkboxMigrants;
-    QCheckBox checkboxAltruismDemes;
+    QCheckBox checkboxAltruismGroups;
     QCheckBox checkboxExtinctions;
     QCheckBox checkboxResult;
     QCheckBox checkboxModelSpecific;
