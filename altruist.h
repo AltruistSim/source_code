@@ -1,13 +1,13 @@
 /****************************  altruist.h   ***********************************
 * Author:        Agner Fog
 * Date created:  1997-10-09
-* Last modified: 2024-09-19
-* Version:       3.002
+* Last modified: 2025-01-09
+* Version:       3.003
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This header file defines common data structures, classes, and functions
 *
-* (c) Copyright 2023-2024 Agner Fog.
+* (c) Copyright 2023-2025 Agner Fog.
 * GNU General Public License, version 3.0 or later
 ******************************************************************************/
 
@@ -22,7 +22,7 @@
 
 // Altruist version number
 const int altruistMajorVersion = 3;
-const int altruistMinorVersion = 2;
+const int altruistMinorVersion = 3;
 
 // maximum number of gene loci
 const int maxLoci = 4;

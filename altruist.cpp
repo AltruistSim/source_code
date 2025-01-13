@@ -2,13 +2,13 @@
 * Author:        Agner Fog
 * Date created:  2023-03-30
 * Last modified: 2024-10-08
-* Version:       3.002
+* Version:       3.003
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the general user interface with menus and dialogs.
 * Each simulation model is defined in a separate C++ file.
 *
-* (c) Copyright 2023-2024 Agner Fog.
+* (c) Copyright 2023-2025 Agner Fog.
 * GNU General Public License, version 3.0 or later
 ******************************************************************************/
 

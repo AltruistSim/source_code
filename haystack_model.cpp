@@ -1,13 +1,13 @@
 /****************************  haystack_model.cpp   *****************************
 * Author:        Agner Fog
 * Date created:  2023-09-04
-* Last modified: 2024-10-13
-* Version:       3.002
+* Last modified: 2025-01-09
+* Version:       3.003
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the haystack model, also known as intrademic group selection
 *
-* (c) Copyright 2023-2024 Agner Fog.
+* (c) Copyright 2023-2025 Agner Fog.
 * GNU General Public License, version 3.0 or later
 ******************************************************************************/
 
@@ -635,21 +635,24 @@ void haystackGenerationFunction(AltruData * d, int state) {
                         case immigrationRandomGroup:     // from random group
                         case immigrationAllNeighbors:    // from all neighbors
                             if (neighborGroup) {
-                                numMigrants = d->ran->poisson(migrationRate * neighborGroup->emigrationPotential);
+                                //numMigrants = d->ran->poisson(migrationRate * neighborGroup->emigrationPotential);
+                                numMigrants = d->ran->binomial(neighborGroup->emigrationPotential, migrationRate);
                             }
                             break;
                         case immigrationStrongNeighbor:  // from neighbor selected according to emigrationPotential
                             if (neighborGroup) {
-                                numMigrants = d->ran->poisson(migrationRate * neighborGroup->nn);
+                                //numMigrants = d->ran->poisson(migrationRate * neighborGroup->nn);
+                                numMigrants = d->ran->binomial(neighborGroup->nn, migrationRate);
                             }
                             break;
                         case immigrationProportional:    // prop. w. own population, from neighbor
-                            numMigrants = d->ran->poisson(migrationRate * group->nn);
+                            //numMigrants = d->ran->poisson(migrationRate * group->nn);
+                            numMigrants = d->ran->binomial(neighborGroup->nn, migrationRate);
                             break;
                         case immigrationVacant:          // prop. w. vacant capacity, from neighbor
                             numMigrants = group->nmax - group->nn + 1;
                             if (numMigrants < 0) numMigrants = 0;
-                            else numMigrants = d->ran->poisson(migrationRate * numMigrants);
+                            else numMigrants = d->ran->binomial(numMigrants, migrationRate);
                             break;
                         }
                     }

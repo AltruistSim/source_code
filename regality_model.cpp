@@ -1,8 +1,8 @@
 /**************************  regality_model.cpp   *****************************
 * Author:        Agner Fog
 * Date created:  2023-10-03
-* Last modified: 2024-10-13
-* Version:       3.002
+* Last modified: 2025-01-11
+* Version:       3.003
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the regality model where groups can steal territory
@@ -11,7 +11,7 @@
 * See: Fog, A: Warlike and Peaceful Societies. Open Book Publishers, 2017.
 * https://doi.org/10.11647/obp.0128
 *
-* (c) Copyright 2023-2024 Agner Fog.
+* (c) Copyright 2023-2025 Agner Fog.
 * GNU General Public License, version 3.0 or later
 ******************************************************************************/
 
@@ -423,6 +423,7 @@ void regalityGenerationFunction(AltruData * d, int state) {
         float expectedMigrants = 0.f;                      // expected number of migrants before randomization
         float stdGroupPopulation = d->territorySizeMax * d->carryingCapacity[locusAltruism]; // population of a big group = d->nMaxPerGroup
         int numMigrants = 0;                               // number of immigrants
+        int maxMigrants = 0;                               // max number of immigrants = population of migration source
 
         // loop for all neighbors
         int iNeighbor;
@@ -442,37 +443,46 @@ void regalityGenerationFunction(AltruData * d, int state) {
                     globalGenePool.gAltruism[1] = d->genePool[locusRegality][1];
                     globalGenePool.emigrationPotential = d->nMaxPerGroup;
                     neighborGroup = &globalGenePool;
-                    expectedMigrants = d->migrationRate[0] * group->nmax;
+                    //expectedMigrants = d->migrationRate[0] * group->nmax;
+                    expectedMigrants = d->migrationRate[0];
+                    maxMigrants = group->nmax;
                     break;
                 case immigrationNeighbor:                  // immigration from one random neighbor
-                    expectedMigrants = d->migrationRate[0] * group->nmax
-                        //* neighborGroup->nn / stdGroupPopulation;
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    //expectedMigrants = d->migrationRate[0] * group->nmax * neighborGroup->nn / stdGroupPopulation; * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * group->nmax / stdGroupPopulation;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationAllNeighbors:              // immigration from all neighbors, proportional to shared border
+                    //expectedMigrants = d->migrationRate[0] * group->nmax * neighborGroup->emigrationPotential * neighborlist[iNeighbor].sharedBorder / (stdGroupPopulation * perimeter);
                     expectedMigrants = d->migrationRate[0] * group->nmax
-                        * neighborGroup->emigrationPotential 
                         * neighborlist[iNeighbor].sharedBorder / (stdGroupPopulation * perimeter);
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationProportional:              // immigration from one random neighbor, proportional to population of target group
-                    expectedMigrants = d->migrationRate[0] * group->nn
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    //expectedMigrants = d->migrationRate[0] * group->nn * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * group->nn / stdGroupPopulation;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationVacant:                    // immigration from one random neighbor, proportional to vacant area
-                    expectedMigrants = d->migrationRate[0] * (group->nmax - group->nn)
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    //expectedMigrants = d->migrationRate[0] * (group->nmax - group->nn) * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * (group->nmax - group->nn) / stdGroupPopulation;
                     if (expectedMigrants < 0) expectedMigrants = 0;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationRandomGroup:               // immigration from a random group
                     {
                     int migrantSource = d->ran->iRandom(1, d->nIslands - 1);
                     if (migrantSource >= iGroup) migrantSource++;     // avoid migration from same group
                     neighborGroup = (TerriGroup*)(d->groupData) + migrantSource; 
-                    expectedMigrants = d->migrationRate[0] * group->nmax
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    //expectedMigrants = d->migrationRate[0] * group->nmax * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * group->nmax / stdGroupPopulation;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     }
                 }
-                numMigrants = d->ran->poisson(expectedMigrants);     // make number of migrants random
+                if (expectedMigrants > 0.f) { 
+                    if (expectedMigrants > 1.f) expectedMigrants = 1.f;
+                    numMigrants = d->ran->binomial(maxMigrants, expectedMigrants); // make number of migrants random
+                }
                 if (numMigrants > neighborGroup->nn) numMigrants = neighborGroup->nn; // cannot migrate more than there are
                 // select migrant genes
                 int32_t gmig0 = d->ran->hypergeometric(numMigrants * 2, neighborGroup->gAltruism[0], neighborGroup->nn * 2);
@@ -491,9 +501,9 @@ void regalityGenerationFunction(AltruData * d, int state) {
         combineGenes(group->gAltruism, genotypes1, d->ran);
 
         // select a leader
-        for (int i = 3; i < 6; i++) genotypes1[i] = 0; // reser leader genotypes
+        for (int i = 3; i < 6; i++) genotypes1[i] = 0; // reset leader genotypes
         if (d->leaderSelection < 0.f) d->leaderSelection = 0.f;
-        bool hasLeader = true;                                       // true if there is a leader
+        bool hasLeader = true;                                        // true if there is a leader
         if (group->nn == 0) {                                         // group is empty
             hasLeader = false;
         }

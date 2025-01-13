@@ -1,14 +1,14 @@
 /***************************  epistasis_model.cpp   ***************************
 * Author:        Agner Fog
 * Date created:  1995-08-13
-* Last modified: 2024-10-13
-* Version:       3.002
+* Last modified: 2025-01-09
+* Version:       3.003
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines a model of epistasis in a structured or viscous population.
 * Epistasis can lead to evolution through punctuated equilibria
 *
-* (c) Copyright 2023-2024 Agner Fog.
+* (c) Copyright 2023-2025 Agner Fog.
 * GNU General Public License, version 3.0 or later
 ******************************************************************************/
 
@@ -660,13 +660,18 @@ void epistasisGenerationFunction(AltruData * d, int state) {
                 case immigrationCommonPool:      // from common pool
                 case immigrationNeighbor:        // from random neighbor group
                 case immigrationRandomGroup:     // from random group
-                    numMigrants = d->ran->poisson(migrationRate * group->nmax);
+                    //numMigrants = d->ran->poisson(migrationRate * group->nmax);
+                    numMigrants = d->ran->binomial(group->nmax, migrationRate);
                     break;
                 case immigrationProportional:    // prop. w. population, from neighbor
-                    numMigrants = d->ran->poisson(migrationRate * group->nn);
+                    //numMigrants = d->ran->poisson(migrationRate * group->nn);
+                    numMigrants = d->ran->binomial(group->nn, migrationRate);
                     break;
                 case immigrationVacant:          // prop. w. vacant capacity, from neighbor
-                    numMigrants = d->ran->poisson(migrationRate * (group->nmax - group->nn + 1));
+                    //numMigrants = d->ran->poisson(migrationRate * (group->nmax - group->nn + 1));
+                    if (group->nn <= group->nmax) {
+                        numMigrants = d->ran->binomial(group->nmax - group->nn + 1, migrationRate);
+                    }
                     break;
                 }
 

@@ -1,15 +1,15 @@
 /************************  territoriality_model.cpp   *************************
 * Author:        Agner Fog
 * Date created:  1999-10-14
-* Last modified: 2024-10-13
-* Version:       3.002
+* Last modified: 2025-01-10
+* Version:       3.003
 * Project:       Altruist: Simulation of evolution in structured populations
 * Description:
 * This C++ file defines the territoriality model where groups can steal territory
 * from each other, and the strength of a group depends on the fraction of 
 * phenotypic altruists in the group.
 *
-* (c) Copyright 2023-2024 Agner Fog.
+* (c) Copyright 2023-2025 Agner Fog.
 * GNU General Public License, version 3.0 or later
 ******************************************************************************/
 
@@ -143,6 +143,13 @@ void territorialityInitFunction(AltruData * d, int state) {
         // enable and disable fields in parameters dialog boxes
         d->bGeographyParametersUsed = 0x511F1;
         d->bGroupPropertiesUsed = 0x1090;
+
+        // names of genes and loci
+        d->sLocusName[locusAltruism] = "altruism";
+        d->sGeneName[locusAltruism][0] = "E";
+        d->sGeneName[locusAltruism][1] = "A";
+        d->sPhenotypeName[locusAltruism][0] = "egoist";
+        d->sPhenotypeName[locusAltruism][1] = "altruist";
 
         d->bEmigrationPattern = 0b1111;                    // emigration patterns supported
         d->bImmigrationPattern = 0b111111;                 // immigration patterns supported
@@ -385,6 +392,7 @@ void territorialityGenerationFunction(AltruData * d, int state) {
         float expectedMigrants = 0.f;                      // expected number of migrants before randomization
         float stdGroupPopulation = d->territorySizeMax * d->carryingCapacity[locusAltruism]; // population of a big group = d->nMaxPerGroup
         int numMigrants = 0;                               // number of immigrants
+        int maxMigrants = 0;                               // max number of immigrants = population of migration source
 
         // loop for all neighbors
         int iNeighbor;
@@ -404,36 +412,38 @@ void territorialityGenerationFunction(AltruData * d, int state) {
                     globalGenePool.gAltruism[1] = d->genePool[locusAltruism][1];
                     globalGenePool.emigrationPotential = d->nMaxPerGroup;
                     neighborGroup = &globalGenePool;
-                    expectedMigrants = d->migrationRate[0] * group->nmax;
+                    expectedMigrants = d->migrationRate[0];
+                    maxMigrants = group->nmax;
                     break;
                 case immigrationNeighbor:                  // immigration from one random neighbor
-                    expectedMigrants = d->migrationRate[0] * group->nmax
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * group->nmax / stdGroupPopulation;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationAllNeighbors:              // immigration from all neighbors, proportional to shared border
                     expectedMigrants = d->migrationRate[0] * group->nmax
-                        * neighborGroup->emigrationPotential 
                         * neighborlist[iNeighbor].sharedBorder / (stdGroupPopulation * perimeter);
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationProportional:              // immigration from one random neighbor, proportional to population of target group
-                    expectedMigrants = d->migrationRate[0] * group->nn
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * group->nn / stdGroupPopulation;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationVacant:                    // immigration from one random neighbor, proportaional to vacant area
-                    expectedMigrants = d->migrationRate[0] * (group->nmax - group->nn)
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * (group->nmax - group->nn) / stdGroupPopulation;
                     if (expectedMigrants < 0) expectedMigrants = 0;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;
                 case immigrationRandomGroup: {             // immigration from a random group
                     int migrantSource = d->ran->iRandom(1, d->nIslands - 1);
                     if (migrantSource >= iGroup) migrantSource++;
                     neighborGroup = (TerriGroup*)(d->groupData) + migrantSource;
-                    expectedMigrants = d->migrationRate[0] * group->nmax
-                        * neighborGroup->emigrationPotential / stdGroupPopulation;
+                    expectedMigrants = d->migrationRate[0] * group->nmax / stdGroupPopulation;
+                    maxMigrants = neighborGroup->emigrationPotential;
                     break;}
                 }
-                if (expectedMigrants > 0.f) {                
-                    numMigrants = d->ran->poisson(expectedMigrants); // make number of migrants random
+                if (expectedMigrants > 0.f) {
+                    if (expectedMigrants > 1.f) expectedMigrants = 1.f;
+                    numMigrants = d->ran->binomial(maxMigrants, expectedMigrants); // make number of migrants random
                 }
                 if (numMigrants > neighborGroup->nn) numMigrants = neighborGroup->nn; // cannot migrate more than there are
                 // select migrant genes
